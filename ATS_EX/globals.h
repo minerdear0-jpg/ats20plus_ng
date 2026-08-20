@@ -1,7 +1,5 @@
 #pragma once
 
-#include <avr/pgmspace.h>
-
 long g_storeTime = millis();
 
 bool g_voltagePinConnnected = false;
@@ -50,30 +48,11 @@ enum SettingType
 
 struct SettingsItem
 {
-    const char* name; // PROGMEM
+    char name[5];
     int8_t param;
     uint8_t type;
     void (*manipulateCallback)(int8_t);
 };
-
-const char SET_ATT[] PROGMEM = "ATT";
-const char SET_SM[]  PROGMEM = "SM ";
-const char SET_SVC[] PROGMEM = "SVC";
-const char SET_SYN[] PROGMEM = "Syn";
-const char SET_DEE[] PROGMEM = "DeE";
-const char SET_AVC[] PROGMEM = "AVC";
-const char SET_SCR[] PROGMEM = "Scr";
-const char SET_SW[]  PROGMEM = "SW ";
-const char SET_SSM[] PROGMEM = "SSM";
-const char SET_COF[] PROGMEM = "COF";
-const char SET_CPU[] PROGMEM = "CPU";
-#if USE_RDS
-const char SET_RDS[] PROGMEM = "RDS";
-#endif
-const char SET_BFO[] PROGMEM = "BFO";
-const char SET_UNI[] PROGMEM = "Uni";
-const char SET_SCA[] PROGMEM = "Sca";
-const char SET_CW[]  PROGMEM = "CW ";
 
 void doAttenuation(int8_t v);
 void doSoftMute(int8_t v);
@@ -97,26 +76,26 @@ void doCWSwitch(int8_t v = 0);
 SettingsItem g_Settings[] =
 {
     //Page 1
-    { SET_ATT, 0,  SettingType::ZeroAuto,     doAttenuation     },  //Attenuation
-    { SET_SM,  0,  SettingType::Num,          doSoftMute        },  //Soft Mute
-    { SET_SVC, 1,  SettingType::Switch,       doSSBAVC          },  //SSB AVC Switch
-    { SET_SYN, 0,  SettingType::Switch,       doSync            },  //SSB Sync
-    { SET_DEE, 1,  SettingType::Switch,       doDeEmp           },  //FM DeEmphasis (0 - 50, 1 - 75)
-    { SET_AVC, 46, SettingType::Num,          doAvc             },  //Automatic Volume Control
+    { "ATT", 0,  SettingType::ZeroAuto,     doAttenuation     },  //Attenuation
+    { "SM ", 0,  SettingType::Num,          doSoftMute        },  //Soft Mute
+    { "SVC", 1,  SettingType::Switch,       doSSBAVC          },  //SSB AVC Switch
+    { "Syn", 0,  SettingType::Switch,       doSync            },  //SSB Sync
+    { "DeE", 1,  SettingType::Switch,       doDeEmp           },  //FM DeEmphasis (0 - 50, 1 - 75)
+    { "AVC", 46, SettingType::Num,          doAvc             },  //Automatic Volume Control
     //Page 2
-    { SET_SCR, 80, SettingType::Num,          doBrightness      },  //Screen Brightness
-    { SET_SW,  0,  SettingType::Switch,       doSWUnits         },  //SW Units
-    { SET_SSM, 1,  SettingType::Switch,       doSSBSoftMuteMode },  //SSB Soft Mute Mode
-    { SET_COF, 0,  SettingType::SwitchAuto,   doCutoffFilter    },  //SSB Cutoff Filter
-    { SET_CPU, 0,  SettingType::Switch,       doCPUSpeed        },  //CPU Frequency
+    { "Scr", 80, SettingType::Num,          doBrightness      },  //Screen Brightness
+    { "SW ", 0,  SettingType::Switch,       doSWUnits         },  //SW Units
+    { "SSM", 1,  SettingType::Switch,       doSSBSoftMuteMode },  //SSB Soft Mute Mode
+    { "COF", 0,  SettingType::SwitchAuto,   doCutoffFilter    },  //SSB Cutoff Filter
+    { "CPU", 0,  SettingType::Switch,       doCPUSpeed        },  //CPU Frequency
 #if USE_RDS
-    { SET_RDS, 1,  SettingType::Num,          doRDSErrorLevel   },  //RDS ErrorLevel
+    { "RDS", 1,  SettingType::Num,          doRDSErrorLevel   },  //RDS ErrorLevel
 #endif
     //Page 3
-    { SET_BFO, 0,  SettingType::Num,          doBFOCalibration  },  //BFO Offset calibration
-    { SET_UNI, 1,  SettingType::Switch,       doUnitsSwitch     },  //Show/Hide frequency units
-    { SET_SCA, 1,  SettingType::Switch,       doScanSwitch      },  //AM Encoder scan switch
-    { SET_CW,  0,  SettingType::Switch,       doCWSwitch        },  //CW is LSB or USB
+    { "BFO", 0,  SettingType::Num,          doBFOCalibration  },  //BFO Offset calibration
+    { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },  //Show/Hide frequency units
+    { "Sca", 1,  SettingType::Switch,       doScanSwitch      },  //AM Encoder scan switch
+    { "CW ", 0,  SettingType::Switch,       doCWSwitch        },  //CW is LSB or USB
 };
 
 enum SettingsIndex
@@ -151,63 +130,42 @@ bool g_SettingEditing = false;
 struct Bandwidth
 {
     uint8_t idx;      //Internal SI473X index
-    const char* desc; // PROGMEM
+    const char* desc;
 };
-
-const char BW_SSB_05[] PROGMEM = "0.5k";
-const char BW_SSB_10[] PROGMEM = "1.0k";
-const char BW_SSB_12[] PROGMEM = "1.2k";
-const char BW_SSB_22[] PROGMEM = "2.2k";
-const char BW_SSB_30[] PROGMEM = "3.0k";
-const char BW_SSB_40[] PROGMEM = "4.0k";
 
 int8_t g_bwIndexSSB = 4;
 Bandwidth g_bandwidthSSB[] =
 {
-    { 4, BW_SSB_05 },
-    { 5, BW_SSB_10 },
-    { 0, BW_SSB_12 },
-    { 1, BW_SSB_22 },
-    { 2, BW_SSB_30 },
-    { 3, BW_SSB_40 }
+    { 4, "0.5k" },
+    { 5, "1.0k" },
+    { 0, "1.2k" },
+    { 1, "2.2k" },
+    { 2, "3.0k" },
+    { 3, "4.0k" }
 };
 const uint8_t g_bwSSBMaxIdx = 5;
 
 int8_t g_bwIndexAM = 4;
 const uint8_t g_maxFilterAM = 6;
-
-const char BW_AM_10[] PROGMEM = "1.0k";
-const char BW_AM_18[] PROGMEM = "1.8k";
-const char BW_AM_20[] PROGMEM = "2.0k";
-const char BW_AM_25[] PROGMEM = "2.5k";
-const char BW_AM_30[] PROGMEM = "3.0k";
-const char BW_AM_40[] PROGMEM = "4.0k";
-const char BW_AM_60[] PROGMEM = "6.0k";
-
 Bandwidth g_bandwidthAM[] =
 {
-    { 4, BW_AM_10 }, // 0
-    { 5, BW_AM_18 }, // 1
-    { 3, BW_AM_20 }, // 2
-    { 6, BW_AM_25 }, // 3
-    { 2, BW_AM_30 }, // 4 - Default
-    { 1, BW_AM_40 }, // 5
-    { 0, BW_AM_60 }  // 6
+    { 4, "1.0k" }, // 0
+    { 5, "1.8k" }, // 1
+    { 3, "2.0k" }, // 2
+    { 6, "2.5k" }, // 3
+    { 2, "3.0k" }, // 4 - Default
+    { 1, "4.0k" }, // 5
+    { 0, "6.0k" }  // 6
 };
 
 int8_t g_bwIndexFM = 0;
-const char BW_FM_AUTO[] PROGMEM = "AUTO";
-const char BW_FM_110[]  PROGMEM = "110k";
-const char BW_FM_84[]   PROGMEM = " 84k";
-const char BW_FM_60[]   PROGMEM = " 60k";
-const char BW_FM_40[]   PROGMEM = " 40k";
-const char* const g_bandwidthFM[] =
+char* g_bandwidthFM[] =
 {
-    BW_FM_AUTO,
-    BW_FM_110,
-    BW_FM_84,
-    BW_FM_60,
-    BW_FM_40
+    "AUTO",
+    "110k",
+    " 84k",
+    " 60k",
+    " 40k"
 };
 
 int g_tabStep[] =
@@ -272,16 +230,12 @@ char g_rdsPrevLen = 0;
 char* g_RDSCells[3];
 #endif
 
-const char TAG_LW[] PROGMEM = "LW";
-const char TAG_MW[] PROGMEM = "MW";
-const char TAG_SW[] PROGMEM = "SW";
-const char TAG_FM[] PROGMEM = "  ";
-const char* const bandTags[] =
+char* bandTags[] =
 {
-    TAG_LW,
-    TAG_MW,
-    TAG_SW,
-    TAG_FM,
+    "LW",
+    "MW",
+    "SW",
+    "  ",
 };
 
 Band g_bandList[] =
@@ -328,18 +282,13 @@ enum Modulations : uint8_t
     FM
 };
 volatile uint8_t g_currentMode = FM;
-const char MODE_AM[]  PROGMEM = "AM ";
-const char MODE_LSB[] PROGMEM = "LSB";
-const char MODE_USB[] PROGMEM = "USB";
-const char MODE_CW[]  PROGMEM = "CW ";
-const char MODE_FM[]  PROGMEM = "FM ";
-const char* const g_bandModeDesc[] = 
+const char* g_bandModeDesc[] = 
 { 
-    MODE_AM,
-    MODE_LSB,
-    MODE_USB,
-    MODE_CW,
-    MODE_FM
+    "AM ",
+    "LSB",
+    "USB",
+    "CW ",
+    "FM "
 };
 volatile uint8_t g_prevMode = FM;
 uint8_t g_seekDirection = 1;

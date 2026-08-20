@@ -83,7 +83,7 @@ void setup()
     if (!(PINC & (1 << (ENCODER_BUTTON - 14))))
     {
         saveAllReceiverInformation();
-        oled.print(F("  EEPROM RESET"));
+        oled.print("  EEPROM RESET");
         oled.setCursor(0, 2);
         for (uint8_t i = 0; i < 16; i++)
         {
@@ -93,10 +93,9 @@ void setup()
     }
     else
     {
-        oledPrint(F(" ATS-20 RECEIVER"), 0, 0, DEFAULT_FONT, true);
-        oledPrint(F("ATS_EX v1.18"), 16, 2);
-        oledPrint(F("Goshante 2024"), 12, 4);
-        oledPrint(F("Best firmware"), 12, 6);
+        oledPrint(" ATS-20 RECEIVER", 0, 0, DEFAULT_FONT, true);
+        oledPrint("ATS_EX v1.18", 16, 2);
+        oledPrint("Goshante 2024", 12, 4);
         delay(2000);
     }
     oled.clear();
@@ -615,11 +614,7 @@ void DrawSetting(uint8_t idx, bool full)
     uint8_t yOffset = place > 2 ? (place - 3) * 2 : place * 2;
     uint8_t xOffset = place > 2 ? 60 : 0;
     if (full)
-    {
-        char name[5];
-        strcpy_P(name, g_Settings[idx].name);
-        oledPrint(name, 5 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && !g_SettingEditing);
-    }
+        oledPrint(g_Settings[idx].name, 5 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && !g_SettingEditing);
     SettingParamToUI(buf, idx);
     oledPrint(buf, 35 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && g_SettingEditing);
 }
@@ -633,7 +628,7 @@ void showSettings()
 
 void showSettingsTitle()
 {
-    oledPrint(F("   SETTINGS  "), 0, 0, DEFAULT_FONT, true);
+    oledPrint("   SETTINGS  ", 0, 0, DEFAULT_FONT, true);
     oled.invertOutput(true);
     oled.print(uint8_t(g_SettingsPage));
     oled.print("/");
@@ -674,7 +669,7 @@ void switchSettings()
 //Draw curremt modulation
 void showModulation()
 {
-    oledPrint_P(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_cmdBand && g_currentMode == FM);
+    oledPrint(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_cmdBand && g_currentMode == FM);
     oled.print(" ");
     if (isSSB() && g_Settings[SettingsIndex::Sync].param == 1)
         oledPrint("S", -1, -1, LastFont, true);
@@ -690,10 +685,7 @@ void showBandTag()
     if (g_sMeterOn || g_displayRDS)
         return;
 
-    if (g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)
-        oledPrint(F("CB"), 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
-    else
-        oledPrint_P(bandTags[g_bandIndex], 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
+    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
 }
 
 //Draw volume level
@@ -909,7 +901,7 @@ void showStep()
     }
 
     uint8_t off = 50;
-    oledPrint(F("St:"), off - 16, 6, DEFAULT_FONT, g_cmdStep);
+    oledPrint("St:", off - 16, 6, DEFAULT_FONT, g_cmdStep);
     oledPrint(buf, off + 8, 6, DEFAULT_FONT, g_cmdStep);
 }
 
@@ -922,77 +914,52 @@ void showSMeter()
 
     g_si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = g_si4735.getCurrentRSSI();
-
-    uint8_t sUnit;
-    uint8_t plusDb;
+    uint8_t blocks;
     if (rssi >= S9_DBUV)
     {
-        sUnit = 9;
-        plusDb = rssi - S9_DBUV;
-        if (plusDb > SMETER_MAX_OVER_S9)
-            plusDb = SMETER_MAX_OVER_S9;
+        blocks = 9 + (rssi - S9_DBUV) / 10;
+        if (blocks > SMETER_SEGMENTS)
+            blocks = SMETER_SEGMENTS;
     }
     else
     {
-        plusDb = 0;
-        sUnit = (uint8_t)(((uint16_t)rssi + 20) / 6);
-        if (sUnit > 9)
-            sUnit = 9;
+        blocks = (uint8_t)((rssi + 20) / 6);
+        if (blocks > 9)
+            blocks = 9;
     }
 
-    // 16 cubes: S1..S9 occupy blocks 0..8 (marker "9" at x=64). Blocks 9..15 = +10..+70 dB.
-    uint8_t blocks = sUnit + (plusDb / 10);
-    if (blocks > SMETER_SEGMENTS)
-        blocks = SMETER_SEGMENTS;
-
-    oledFillCols(0, 6, 0x00, 128);
-    oledDrawGlyph6x8(0, 6, GLYPH_S);
-    oledDrawDigit6x8(64, 6, 9);
-    oledDrawGlyph6x8(112, 6, GLYPH_PLUS);
-
-    if (plusDb == 0)
-        oledDrawDigit6x8(76, 6, sUnit);
-    else if (plusDb >= 10)
+    for (uint8_t page = 6; page < 8; page++)
     {
-        oledDrawGlyph6x8(76, 6, GLYPH_PLUS);
-        oledDrawDigit6x8(83, 6, plusDb / 10);
-        oledDrawDigit6x8(90, 6, plusDb % 10);
-    }
-    else
-    {
-        oledDrawGlyph6x8(76, 6, GLYPH_PLUS);
-        oledDrawDigit6x8(83, 6, plusDb);
-    }
-
-    for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
-    {
-        uint8_t x = i * 8;
-        if (i < blocks)
-            oledFillCols(x, 7, 0xFF, 6);
-        else
-            oledFillCols(x, 7, 0x80, 6);
-        oledFillCols(x + 6, 7, 0x00, 2);
+        oled.setCursor(0, page);
+        uint8_t empty = (page == 6) ? 0x01 : 0x80;
+        oled.startData();
+        for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
+        {
+            oled.repeatData((i < blocks) ? 0xFF : empty, 6);
+            oled.repeatData(0, 2);
+        }
+        oled.endData();
     }
 }
 
 //Draw bandwidth (Ignored for CW mode)
 void showBandwidth()
 {
-    char bw[6];
+    char* bw;
     if (isSSB())
     {
+        bw = (char*)g_bandwidthSSB[g_bwIndexSSB].desc;
         if (g_currentMode == CW)
-        {
-            bw[0] = bw[1] = bw[2] = bw[3] = ' ';
-            bw[4] = 0;
-        }
-        else
-            strcpy_P(bw, g_bandwidthSSB[g_bwIndexSSB].desc);
+            bw = "    ";
     }
     else if (g_currentMode == AM)
-        strcpy_P(bw, g_bandwidthAM[g_bwIndexAM].desc);
+    {
+        bw = (char*)g_bandwidthAM[g_bwIndexAM].desc;
+    }
     else
-        strcpy_P(bw, g_bandwidthFM[g_bwIndexFM]);
+    {
+        bw = (char*)g_bandwidthFM[g_bwIndexFM];
+    }
 
     oledPrint(bw, 45, 0, DEFAULT_FONT, g_cmdBw);
 }

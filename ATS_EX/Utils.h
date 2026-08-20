@@ -1,8 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-#include <avr/pgmspace.h>
-
 const DCfont* LastFont = DEFAULT_FONT;
 
 void oledSetFont(const DCfont* font)
@@ -38,67 +35,12 @@ void oledPrint(uint16_t u, int offX = -1, int offY = -1, const DCfont* font = La
         oled.invertOutput(false);
 }
 
-void oledPrint(const __FlashStringHelper* text, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)
-{
-    oledSetFont(font);
-    if (invert)
-        oled.invertOutput(invert);
-    if (offX >= 0 && offY >= 0)
-        oled.setCursor(offX, offY);
-    oled.print(text);
-    if (invert)
-        oled.invertOutput(false);
-}
-
-void oledPrint_P(const char* pText, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)
-{
-    char buf[6];
-    strcpy_P(buf, pText);
-    oledPrint(buf, offX, offY, font, invert);
-}
-
-// 8x16 line at page y: two SSD1306 pages. Cheaper than a 17-byte RAM spaces string.
 void oledClearLine(uint8_t y)
 {
-    oledSetFont(DEFAULT_FONT);
     oled.setCursor(0, y);
-    oled.clearToEOL();
-}
-
-void oledFillCols(uint8_t x, uint8_t page, uint8_t pattern, uint8_t width)
-{
-    oled.setCursor(x, page);
-    oled.fillLength(pattern, width);
-}
-
-void oledDrawGlyph6x8(uint8_t x, uint8_t page, const uint8_t* glyph)
-{
-    oled.setCursor(x, page);
-    oled.startData();
-    for (uint8_t i = 0; i < 6; i++)
-        oled.sendData(pgm_read_byte(&glyph[i]));
-    oled.endData();
-}
-
-// 6x8, column-major, LSB = top pixel. Page-tall only — does not collide with the 7-seg frequency.
-const uint8_t GLYPH_S[] PROGMEM = { 0x26, 0x49, 0x49, 0x49, 0x32, 0x00 };
-const uint8_t GLYPH_PLUS[] PROGMEM = { 0x08, 0x08, 0x3E, 0x08, 0x08, 0x00 };
-const uint8_t GLYPH_DIGIT[][6] PROGMEM = {
-    { 0x3E, 0x41, 0x41, 0x41, 0x3E, 0x00 },
-    { 0x00, 0x42, 0x7F, 0x40, 0x00, 0x00 },
-    { 0x62, 0x51, 0x49, 0x49, 0x46, 0x00 },
-    { 0x22, 0x49, 0x49, 0x49, 0x36, 0x00 },
-    { 0x18, 0x14, 0x12, 0x7F, 0x10, 0x00 },
-    { 0x27, 0x45, 0x45, 0x45, 0x39, 0x00 },
-    { 0x3E, 0x49, 0x49, 0x49, 0x30, 0x00 },
-    { 0x01, 0x71, 0x09, 0x05, 0x03, 0x00 },
-    { 0x36, 0x49, 0x49, 0x49, 0x36, 0x00 },
-    { 0x06, 0x49, 0x49, 0x49, 0x3E, 0x00 }
-};
-
-void oledDrawDigit6x8(uint8_t x, uint8_t page, uint8_t digit)
-{
-    oledDrawGlyph6x8(x, page, GLYPH_DIGIT[digit]);
+    oled.fillLength(0, 128);
+    oled.setCursor(0, y + 1);
+    oled.fillLength(0, 128);
 }
 
 //Better than sprintf which has overwhelmingly large overhead, it helps to reduce binary size
