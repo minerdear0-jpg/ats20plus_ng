@@ -83,7 +83,7 @@ void setup()
     if (!(PINC & (1 << (ENCODER_BUTTON - 14))))
     {
         saveAllReceiverInformation();
-        oled.print("  EEPROM RESET");
+        oled.print(F("  EEPROM RESET"));
         oled.setCursor(0, 2);
         for (uint8_t i = 0; i < 16; i++)
         {
@@ -93,10 +93,10 @@ void setup()
     }
     else
     {
-        oledPrint(" ATS-20 RECEIVER", 0, 0, DEFAULT_FONT, true);
-        oledPrint("ATS_EX v1.18", 16, 2);
-        oledPrint("Goshante 2024", 12, 4);
-        oledPrint("Best firmware", 12, 6);
+        oledPrint(F(" ATS-20 RECEIVER"), 0, 0, DEFAULT_FONT, true);
+        oledPrint(F("ATS_EX v1.18"), 16, 2);
+        oledPrint(F("Goshante 2024"), 12, 4);
+        oledPrint(F("Best firmware"), 12, 6);
         delay(2000);
     }
     oled.clear();
@@ -446,7 +446,7 @@ void doSeek()
 
 #if USE_RDS
     if (g_displayRDS)
-        oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+        oledClearLine(6);
 #endif
     g_seekStop = false;
     g_si4735.seekStationProgress(showFrequencySeek, checkStopSeeking, g_seekDirection);
@@ -467,7 +467,7 @@ void showStatus(bool cleanFreq)
 
 void updateLowerDisplayLine()
 {
-    oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+    oledClearLine(6);
     showModulation();
     showStep();
     showCharge(true);
@@ -615,7 +615,11 @@ void DrawSetting(uint8_t idx, bool full)
     uint8_t yOffset = place > 2 ? (place - 3) * 2 : place * 2;
     uint8_t xOffset = place > 2 ? 60 : 0;
     if (full)
-        oledPrint(g_Settings[idx].name, 5 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && !g_SettingEditing);
+    {
+        char name[5];
+        strcpy_P(name, g_Settings[idx].name);
+        oledPrint(name, 5 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && !g_SettingEditing);
+    }
     SettingParamToUI(buf, idx);
     oledPrint(buf, 35 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && g_SettingEditing);
 }
@@ -629,7 +633,7 @@ void showSettings()
 
 void showSettingsTitle()
 {
-    oledPrint("   SETTINGS  ", 0, 0, DEFAULT_FONT, true);
+    oledPrint(F("   SETTINGS  "), 0, 0, DEFAULT_FONT, true);
     oled.invertOutput(true);
     oled.print(uint8_t(g_SettingsPage));
     oled.print("/");
@@ -670,7 +674,7 @@ void switchSettings()
 //Draw curremt modulation
 void showModulation()
 {
-    oledPrint(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_cmdBand && g_currentMode == FM);
+    oledPrint_P(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_cmdBand && g_currentMode == FM);
     oled.print(" ");
     if (isSSB() && g_Settings[SettingsIndex::Sync].param == 1)
         oledPrint("S", -1, -1, LastFont, true);
@@ -686,7 +690,10 @@ void showBandTag()
     if (g_sMeterOn || g_displayRDS)
         return;
 
-    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
+    if (g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)
+        oledPrint(F("CB"), 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
+    else
+        oledPrint_P(bandTags[g_bandIndex], 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
 }
 
 //Draw volume level
@@ -717,11 +724,8 @@ void showCharge(bool forceShow)
     if (!g_voltagePinConnnected)
         return;
 
-    // mV, Percent
-    //This values represent voltage values in ATMega328p analog units with reference voltage 3.30v
-    //Voltage pin reads voltage from voltage divider, so it have to be 1/2 of Li-Ion battery voltage
-    constexpr const uint8_t rows = 10;
-    const uint16_t dischargeTable[rows][2] =
+    // ADC counts at A2 (1/2 Li-Ion via 10k+10k, 3.30 V reference)
+    static const uint16_t dischargeTable[][2] PROGMEM =
     {
         { 643, 100 },  //4.15v
         { 620, 95  },  //4.05v
@@ -731,31 +735,10 @@ void showCharge(bool forceShow)
         { 558, 40  },  //3.60v
         { 542, 20  },  //3.50v
         { 503, 15  },  //3.25v
-        { 496, 5  },   //3.20v
-        { 488, 0  },   //3.15v
+        { 496, 5   },  //3.20v
+        { 488, 0   },  //3.15v
     };
-
-    auto getBatteryPercentage = [&](uint16_t currentSamples) -> uint8_t
-    {
-        if (currentSamples >= dischargeTable[0][0]) 
-            return 100;
-
-        if (currentSamples <= dischargeTable[rows - 1][0]) 
-            return 0;
-
-        for (uint8_t i = 0; i < rows - 1; ++i) 
-        {
-            if (currentSamples >= dischargeTable[i + 1][0] && currentSamples <= dischargeTable[i][0]) 
-            {
-                uint16_t voltageDiff = dischargeTable[i][0] - dischargeTable[i + 1][0];
-                uint16_t percentageDiff = dischargeTable[i][1] - dischargeTable[i + 1][1];
-                uint16_t voltageOffset = currentSamples - dischargeTable[i + 1][0];
-                return dischargeTable[i + 1][1] + (percentageDiff * voltageOffset + voltageDiff / 2) / voltageDiff;
-            }
-        }
-
-        return 0;
-    };
+    const uint8_t rows = sizeof(dischargeTable) / sizeof(dischargeTable[0]);
 
     static uint32_t lastChargeShow = 0;
     static int16_t averageSamples = 0;
@@ -766,10 +749,36 @@ void showCharge(bool forceShow)
 
     if ((millis() - lastChargeShow) > 10000 || forceShow)
     {
+        uint16_t currentSamples = (uint16_t)averageSamples;
+        uint8_t percents = 0;
+        uint16_t v0 = pgm_read_word(&dischargeTable[0][0]);
+        uint16_t vLast = pgm_read_word(&dischargeTable[rows - 1][0]);
+
+        if (currentSamples >= v0)
+            percents = 100;
+        else if (currentSamples <= vLast)
+            percents = 0;
+        else
+        {
+            for (uint8_t i = 0; i < rows - 1; ++i)
+            {
+                uint16_t vHi = pgm_read_word(&dischargeTable[i][0]);
+                uint16_t vLo = pgm_read_word(&dischargeTable[i + 1][0]);
+                if (currentSamples >= vLo && currentSamples <= vHi)
+                {
+                    uint16_t pHi = pgm_read_word(&dischargeTable[i][1]);
+                    uint16_t pLo = pgm_read_word(&dischargeTable[i + 1][1]);
+                    uint16_t voltageDiff = vHi - vLo;
+                    uint16_t percentageDiff = pHi - pLo;
+                    uint16_t voltageOffset = currentSamples - vLo;
+                    percents = (uint8_t)(pLo + (percentageDiff * voltageOffset + voltageDiff / 2) / voltageDiff);
+                    break;
+                }
+            }
+        }
+
         char buf[4];
         buf[3] = 0;
-        int16_t percents = getBatteryPercentage(averageSamples);
-
         uint8_t il = ilen(percents) < 3 ? 2 : 3;
         convertToChar(buf, percents, il);
 
@@ -818,7 +827,7 @@ void showRDS()
             succeed = false;
         }
         g_rdsPrevLen = 0;
-        oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+        oledClearLine(6);
     }
     lastUpdatedFreq = g_currentFrequency;
 
@@ -900,7 +909,7 @@ void showStep()
     }
 
     uint8_t off = 50;
-    oledPrint("St:", off - 16, 6, DEFAULT_FONT, g_cmdStep);
+    oledPrint(F("St:"), off - 16, 6, DEFAULT_FONT, g_cmdStep);
     oledPrint(buf, off + 8, 6, DEFAULT_FONT, g_cmdStep);
 }
 
@@ -909,39 +918,81 @@ void showSMeter()
     static uint32_t sMeterUpdated = 0;
     if (millis() - sMeterUpdated < 100)
         return;
+    sMeterUpdated = millis();
 
     g_si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = g_si4735.getCurrentRSSI();
-    rssi = rssi > 64 ? 64 : rssi;
 
-    int sMeterValue = rssi / (64 / 16);
-    char buf[17];
-    for (uint8_t i = 0; i < sizeof(buf) - 1; i++)
-        buf[i] = i < sMeterValue ? '|' : ' ';
-    buf[sizeof(buf) - 1] = 0x0;
+    uint8_t sUnit;
+    uint8_t plusDb;
+    if (rssi >= S9_DBUV)
+    {
+        sUnit = 9;
+        plusDb = rssi - S9_DBUV;
+        if (plusDb > SMETER_MAX_OVER_S9)
+            plusDb = SMETER_MAX_OVER_S9;
+    }
+    else
+    {
+        plusDb = 0;
+        sUnit = (uint8_t)(((uint16_t)rssi + 20) / 6);
+        if (sUnit > 9)
+            sUnit = 9;
+    }
 
-    oledPrint(buf, 0, 6, DEFAULT_FONT);
-    sMeterUpdated = millis();
+    // 16 cubes: S1..S9 occupy blocks 0..8 (marker "9" at x=64). Blocks 9..15 = +10..+70 dB.
+    uint8_t blocks = sUnit + (plusDb / 10);
+    if (blocks > SMETER_SEGMENTS)
+        blocks = SMETER_SEGMENTS;
+
+    oledFillCols(0, 6, 0x00, 128);
+    oledDrawGlyph6x8(0, 6, GLYPH_S);
+    oledDrawDigit6x8(64, 6, 9);
+    oledDrawGlyph6x8(112, 6, GLYPH_PLUS);
+
+    if (plusDb == 0)
+        oledDrawDigit6x8(76, 6, sUnit);
+    else if (plusDb >= 10)
+    {
+        oledDrawGlyph6x8(76, 6, GLYPH_PLUS);
+        oledDrawDigit6x8(83, 6, plusDb / 10);
+        oledDrawDigit6x8(90, 6, plusDb % 10);
+    }
+    else
+    {
+        oledDrawGlyph6x8(76, 6, GLYPH_PLUS);
+        oledDrawDigit6x8(83, 6, plusDb);
+    }
+
+    for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
+    {
+        uint8_t x = i * 8;
+        if (i < blocks)
+            oledFillCols(x, 7, 0xFF, 6);
+        else
+            oledFillCols(x, 7, 0x80, 6);
+        oledFillCols(x + 6, 7, 0x00, 2);
+    }
 }
 
 //Draw bandwidth (Ignored for CW mode)
 void showBandwidth()
 {
-    char* bw;
+    char bw[6];
     if (isSSB())
     {
-        bw = (char*)g_bandwidthSSB[g_bwIndexSSB].desc;
         if (g_currentMode == CW)
-            bw = "    ";
+        {
+            bw[0] = bw[1] = bw[2] = bw[3] = ' ';
+            bw[4] = 0;
+        }
+        else
+            strcpy_P(bw, g_bandwidthSSB[g_bwIndexSSB].desc);
     }
     else if (g_currentMode == AM)
-    {
-        bw = (char*)g_bandwidthAM[g_bwIndexAM].desc;
-    }
+        strcpy_P(bw, g_bandwidthAM[g_bwIndexAM].desc);
     else
-    {
-        bw = (char*)g_bandwidthFM[g_bwIndexFM];
-    }
+        strcpy_P(bw, g_bandwidthFM[g_bwIndexFM]);
 
     oledPrint(bw, 45, 0, DEFAULT_FONT, g_cmdBw);
 }
@@ -1005,14 +1056,14 @@ void bandSwitch(bool up)
         if (g_sMeterOn)
         {
             g_sMeterOn = false;
-            oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+            oledClearLine(6);
         }
 
 #if USE_RDS
         if (g_displayRDS && g_currentMode != FM)
         {
             g_displayRDS = false;
-            oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+            oledClearLine(6);
         }
 #endif
 
@@ -1383,7 +1434,7 @@ void doRDS()
     if (g_displayRDS)
     {
         g_sMeterOn = false;
-        oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+        oledClearLine(6);
         g_si4735.getRdsStatus();
         showRDS();
     }
@@ -1511,7 +1562,7 @@ void doFrequencyTune()
         g_currentFrequency += g_tabStepFM[g_FMStepIndex] * g_encoderCount; //g_si4735.getFrequency() is too slow
 #if USE_RDS
         if (g_displayRDS)
-            oledPrint(_literal_EmptyLine, 0, 6, DEFAULT_FONT);
+            oledClearLine(6);
 #endif
     }
     else
@@ -1816,6 +1867,7 @@ void loop()
             if (g_sMeterOn)
             {
                 g_displayRDS = false;
+                oledClearLine(6);
                 showSMeter();
             }
             else
