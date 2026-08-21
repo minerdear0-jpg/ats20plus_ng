@@ -12,6 +12,7 @@ bool g_cmdBw = false;
 bool g_cmdBand = false;
 bool g_settingsActive = false;
 bool g_sMeterOn = false;
+uint8_t g_sMeterDrawnVal = 255;
 bool g_displayOn = true;
 bool g_displayRDS = false;
 bool g_rdsSwitchPressed = false;
@@ -296,6 +297,7 @@ uint8_t g_seekDirection = 1;
 //Special logic for fast and responsive frequency surfing
 uint32_t g_lastFreqChange = 0;
 bool g_processFreqChange = 0;
+bool g_ssbNeedHwFreq = false;
 uint8_t g_volume = DEFAULT_VOLUME;
 
 Rotary g_encoder = Rotary(ENCODER_PIN_A, ENCODER_PIN_B);

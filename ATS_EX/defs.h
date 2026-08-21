@@ -44,6 +44,9 @@
 // Default values
 #define MIN_ELAPSED_TIME 100
 #define MIN_ELAPSED_RSSI_TIME 150
+// After the last encoder tick, wait this long before committing SI4735 (OLED already shows requested freq).
+#define FREQ_COMMIT_MS 70
+#define BACKGROUND_UI_MS 1000
 
 // IARU S-meter: Si473x RSSI is dBµV. S9 = 50 µV = 34 dBµV, 6 dB per S-unit.
 #define S9_DBUV 34

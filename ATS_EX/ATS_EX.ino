@@ -509,7 +509,6 @@ void showFrequency(bool cleanDisplay = false)
 void showFrequencySeek(uint16_t freq)
 {
     g_currentFrequency = freq;
-    delay(10);
     if (g_currentMode == FM)
     {
         //Fix random 10th KHz fraction
@@ -1013,6 +1012,10 @@ void showSMeter()
         val = 9 + plusDb / 10;
     if (val > 15)
         val = 15;
+
+    if (val == g_sMeterDrawnVal)
+        return;
+    g_sMeterDrawnVal = val;
 
     uint8_t digit = 0;
     if (sUnit)
@@ -1615,6 +1618,8 @@ bool clampSSBBand()
     {
         g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
         g_si4735.setFrequency(g_currentFrequency);
+        g_ssbNeedHwFreq = false;
+        g_processFreqChange = false;
         bfoReset();
         return true;
     }
@@ -1686,46 +1691,60 @@ void doFrequencyTuneSSB()
     }
 
     g_currentBFO = newBFO;
-    updateBFO();
-
     if (redundant != 0)
-    {
-        g_si4735.setFrequency(g_currentFrequency);
-        agcSetFunc(); //Re-apply to remove noize
-        g_currentFrequency = g_si4735.getFrequency();
-        g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
-    }
+        g_ssbNeedHwFreq = true;
 
     g_bandList[g_bandIndex].currentFreq = g_currentFrequency + (g_currentBFO / 1000);
+    g_processFreqChange = true;
     g_lastFreqChange = millis();
     g_previousFrequency = 0; //Force EEPROM update
     if (!clampSSBBand()) //If we move outside of current band - switch it
         showFrequency();
 }
 
+// OLED already shows requested tune; push SI4735 after the encoder burst settles.
+void commitRadioFrequency()
+{
+    if (isSSB())
+    {
+        if (g_ssbNeedHwFreq)
+        {
+            g_si4735.setFrequency(g_currentFrequency);
+            agcSetFunc();
+            g_currentFrequency = g_si4735.getFrequency();
+            g_bandList[g_bandIndex].currentFreq = g_currentFrequency + (g_currentBFO / 1000);
+            g_ssbNeedHwFreq = false;
+        }
+        updateBFO();
+    }
+    else
+        g_si4735.setFrequency(g_currentFrequency);
+    g_processFreqChange = false;
+}
+
 void loop()
 {
     uint8_t x;
     bool skipButtonEvents = false;
-    bool frequencyRecentlyUpdated = millis() - g_lastFreqChange < 70;
+    bool frequencyRecentlyUpdated = millis() - g_lastFreqChange < FREQ_COMMIT_MS;
 
-    //Faster frequency tune
-    if (g_processFreqChange && !isSSB())
+    // Encoder always wins: no RDS / S-meter / EEPROM I2C while ticks are pending.
+    if (g_processFreqChange)
     {
         if (!frequencyRecentlyUpdated && g_encoderCount == 0)
-        {
-            g_si4735.setFrequency(g_currentFrequency);
-            g_processFreqChange = false;
-        }
+            commitRadioFrequency();
         else if (frequencyRecentlyUpdated && g_encoderCount != 0)
         {
-            doFrequencyTune();
+            if (isSSB())
+                doFrequencyTuneSSB();
+            else
+                doFrequencyTune();
             g_encoderCount = 0;
             return;
         }
     }
-    
-    if (millis() - g_lastFreqChange >= 1000)
+
+    if (g_encoderCount == 0 && millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
     {
 #if USE_RDS
         showRDS();
@@ -1774,7 +1793,6 @@ void loop()
             {
                 (*g_Settings[g_SettingSelected].manipulateCallback)(g_encoderCount);
                 DrawSetting(g_SettingSelected, false);
-                delay(MIN_ELAPSED_TIME);
             }
         }
         else if (g_cmdVolume)
@@ -1938,6 +1956,7 @@ void loop()
             if (g_sMeterOn)
             {
                 g_displayRDS = false;
+                g_sMeterDrawnVal = 255;
                 oledClearLine(6);
                 showSMeter();
             }
