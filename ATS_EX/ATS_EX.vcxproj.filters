@@ -38,6 +38,9 @@
     <ClInclude Include="globals.h">
       <Filter>Header Files\Globals and defs</Filter>
     </ClInclude>
+    <ClInclude Include="radio.h">
+      <Filter>Header Files\Globals and defs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ATS_EX.ino">
@@ -47,6 +50,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rotary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="globals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="radio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

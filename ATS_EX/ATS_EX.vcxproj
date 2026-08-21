@@ -86,6 +86,8 @@
     </ClCompile>
     <ClCompile Include="Rotary.cpp" />
     <ClCompile Include="SimpleButton.cpp" />
+    <ClCompile Include="globals.cpp" />
+    <ClCompile Include="radio.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectCapability Include="VisualMicro" />
@@ -94,6 +96,7 @@
     <ClInclude Include="defs.h" />
     <ClInclude Include="font14x24sevenSeg.h" />
     <ClInclude Include="globals.h" />
+    <ClInclude Include="radio.h" />
     <ClInclude Include="patch_ssb_compressed.h" />
     <ClInclude Include="Rotary.h" />
     <ClInclude Include="SimpleButton.h" />
