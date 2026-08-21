@@ -1,0 +1,12 @@
+reports/
+Промежуточная документация ветки ATS-20Plus_next. Не путать с README репозитория.
+
+Спецификации (опора)
+- ATS-20_firmware_analysis.txt — аудит v1.18, latency, I2C, encoder, фазы работ
+- ATS-20_next_generation_architecture_report.txt — Radio Core / UI Core, deferred tune, dirty OLED
+- ATS-20_UI_Sweet_Spot.txt — UI: NORMAL / FOCUS / TRANSIENT, frequency hero, design rules v0.1
+
+Журнал ветки
+- ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы
+
+Правило: новые решения по архитектуре и UI кратко дописывать в log, полные отчёты не переписывать.

@@ -1,0 +1,116 @@
+ATS-20 UI Sweet Spot
+Спецификация UI для ветки ATS-20Plus_next
+
+Главный принцип
+
+Основной экран показывает состояние приёмника. Transient UI показывает действие пользователя. Focus показывает, чем сейчас управляет encoder.
+
+Это три разных информационных слоя, и смешивать их не надо.
+
+1. Основной экран: 4 главных объекта
+
+Permanent UI ограничен четырьмя вещами:
+
+- MODE / STATUS
+- FREQUENCY (primary)
+- SIGNAL
+- Secondary parameters (мелкие, спокойные)
+
+Иерархия взгляда: MODE → FREQUENCY → SIGNAL. Остальное не орёт.
+
+2. Частота занимает центральное место
+
+Особенно в SSB: 7.123.450 MHz — главный визуальный объект. Крупный шрифт, не рой мелких цифр.
+
+3. Encoder = один активный объект
+
+В каждый момент один encoder = один очевидный объект управления (STEP или BFO или VOL). Не бывает нескольких «активных» сразу. Это focus.
+
+4. Focus = заливка
+
+Обычный параметр: STEP 10 Hz
+Focused: чёрный текст на белой заливке (invert). Без рамок, стрелок, курсоров.
+
+5. Transient UI = увеличенный focus
+
+Когда пользователь начинает действие, focus становится временным псевдоокном в верхней зоне. Значение крупно. Через ~1–1.5 с после остановки — обычный экран.
+
+6. Не всё становится transient
+
+A. Direct control (часто): Frequency, Volume, Step, BFO — focus/transient.
+B. Contextual (иногда): Bandwidth, AGC, RF gain, ATT, Mode — могут иметь transient selection.
+C. Configuration (редко): Display, Battery, Calibration, RDS options, System — обычное меню.
+
+7. FM и SSB — разная плотность информации
+
+FM: не держать BFO постоянно; RDS на второй информационной строке.
+SSB: частота + Step + BFO — главные рабочие параметры.
+Одна design system, разная плотность.
+
+8. Верхняя зона ~20 px reserved
+
+Idle: MODE / STATUS (например LSB и S9).
+Во время операции: залитая полоса STEP / 100 Hz.
+Renderer: main layer + transient layer, без полной перерисовки экрана.
+
+9. Три режима взаимодействия
+
+NORMAL — приёмник работает, encoder крутит frequency.
+FOCUS — короткое нажатие encoder переключает объект: FREQUENCY → STEP → VOLUME → BFO → FREQUENCY.
+TRANSIENT — пользователь меняет значение, большое окно; timeout → NORMAL.
+
+10. Кнопки выбирают функцию, encoder меняет значение
+
+MODE, STEP, BAND, MENU. Без лабиринтов.
+
+11. Нет подтверждений для обычных операций
+
+STEP 100 Hz применяется сразу. Не SELECT / OK / SAVE.
+
+12. Анимация почти незаметна
+
+Появление transient быстро, focus сразу, значение мгновенно. Никакого scrolling без необходимости.
+
+13. Шрифты
+
+Large — frequency. Small — всё остальное. Опционально средний только для transient value.
+
+14. Информационный бюджет
+
+Если параметр не помогает решить что-то в ближайшие секунды — ему не место на основном экране.
+Не держать постоянно AGC FAST, ATT OFF, RSSI 37, SNR, AFC, DEEMPH, DAC и т.п.
+
+15. Главное визуальное правило
+
+Calm when idle, explicit when active.
+
+16. Архитектура
+
+INPUT → UI STATE → NORMAL | FOCUS | TRANSIENT → UI RENDERER → dirty regions → OLED
+Отдельно: ENCODER → INPUT EVENT → UI STATE → RADIO COMMAND
+UI не блокирует Radio Core.
+
+17. Design Rules v0.1
+
+01. Frequency is the hero.
+02. Encoder always has one obvious target.
+03. Focus is represented by filled background.
+04. Transient UI temporarily enlarges the active control.
+05. Transient UI occupies the upper screen area.
+06. Main screen never becomes a menu.
+07. Frequent operations are direct.
+08. Rare operations belong to configuration menus.
+09. FM and SSB use different information density.
+10. No confirmation for reversible everyday actions.
+11. UI returns automatically to a calm idle state.
+12. Rendering is event-driven and dirty-region based.
+13. Every pixel must justify its existence.
+
+Baseline screens
+
+SSB idle: LSB + S9; large frequency; S-meter; STEP / BW; BFO / VOL.
+SSB + STEP transient: inverted STEP + value in top band; frequency; S-meter; BFO / VOL.
+SSB + BFO transient: inverted BFO + value; frequency; S-meter; STEP / VOL.
+FM idle: FM + STEREO; frequency; RDS name; S-meter + VOL; STEP / BW.
+
+Следующий этап после консолидации: полный набор состояний в сетке 128×64 (Normal, Focus, Transient, Mode, Band, STEP, BFO, Volume, RDS, Settings) и проверка на реальном сценарии SSB.

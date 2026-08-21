@@ -27,6 +27,7 @@ void showStatus(bool cleanFreq = false);
 void uiFlush();
 void paintTransient(const char* title, const char* value);
 void restoreIdleHeader();
+void showBfoIdle();
 void applyBandConfiguration(bool extraSSBReset = false);
 
 bool isSSB()
@@ -558,6 +559,7 @@ void showStatus(bool cleanFreq)
     showBandwidth();
     showCharge(true);
     showVolume();
+    showBfoIdle();
     if (!g_settingsActive)
         showSMeter();
 }
@@ -568,6 +570,7 @@ void updateLowerDisplayLine()
     showModulation();
     showStep();
     showCharge(true);
+    showBfoIdle();
 }
 
 //Converts settings value to UI value
@@ -901,7 +904,7 @@ void showCharge(bool forceShow)
         if (il < 3)
             buf[2] = '%';
 
-        if (!g_settingsActive && !g_sMeterOn && !g_displayRDS)
+        if (!g_settingsActive && !g_sMeterOn && !g_displayRDS && !isSSB())
         {
             static uint8_t lastPct = 255;
             if (forceShow || percents != lastPct)
@@ -1150,15 +1153,29 @@ void restoreIdleHeader()
     showBandwidth();
 }
 
-void paintBfoTransient()
+void formatBfo(char* buf)
 {
-    char buf[7];
     int16_t b = g_currentBFO;
     buf[0] = (b < 0) ? '-' : '+';
     if (b < 0)
         b = -b;
     convertToChar(&buf[1], (uint16_t)b, 5);
     buf[6] = 0;
+}
+
+void showBfoIdle()
+{
+    if (!isSSB() || g_settingsActive || g_displayRDS)
+        return;
+    char buf[7];
+    formatBfo(buf);
+    oledPrint(buf, 80, 6, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
+}
+
+void paintBfoTransient()
+{
+    char buf[7];
+    formatBfo(buf);
     paintTransient("BFO", buf);
 }
 
@@ -1200,8 +1217,8 @@ void cycleEncoderFocus()
     }
     else
     {
-        g_uiLayer = UI_LAYER_TRANSIENT;
-        paintBfoTransient();
+        g_uiLayer = UI_LAYER_FOCUS;
+        showBfoIdle();
     }
 }
 
