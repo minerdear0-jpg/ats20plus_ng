@@ -15,7 +15,7 @@ I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — жд
 - Слои NORMAL / FOCUS / TRANSIENT; клик энкодера: Freq → STEP → VOL → BFO (SSB).
 - Transient: залитая верхняя полоса; timeout 1.5 с.
 - Seek AM/FM: длинное нажатие энкодера.
-- S-метр всегда page 2.
+- S-метр всегда под частотой (page 5); 7-seg pages 2–4. Порядок MODE → FREQ → SIGNAL.
 - SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
 - FM: «ST» при пилоте; RDS-строка включена при входе на FM (MODE её снимает/ставит). Энкодер на FM не переключает ячейки RDS — только focus.
 - Splash v1.19.
@@ -23,16 +23,22 @@ I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — жд
 Компромиссы
 - Одна secondary-строка (page 6), не две как на макете Sweet Spot.
 - Нет иерархии SETTINGS.
-- Радио и UI в одном ATS_EX.ino.
+- Радио и UI в одном ATS_EX.ino (отдельный commit-модуль отложен: мало flash).
 - Переключение PS/RT/PTY энкодером убрано, чтобы не воровать focus (MODE = RDS on/off).
 
 Flash / RAM
-- 31600 / 32256 flash, 1216 SRAM (Uno, FM ST + RDS default).
+- 31600 / 32256 flash, 1216 SRAM (Uno; сдвиг страниц константами).
 
 Дальше
-1. Radio commit-модуль, если влезет во flash.
-2. I2C 400 kHz после замера.
-3. Сверка pixel-grid с макетом и подгонка.
+1. I2C 400 kHz после замера.
+2. Подгонка плотности secondary под макет, если останется flash.
+3. Radio commit-модуль — только если появится запас.
+
+Оценка Radio-модуля (не писать зря)
+Замер по Uno ELF + LTO: loop, doFrequencyTune, commitRadioFrequency, clampSSBBand в nm нет — LTO встроил их в main. Живые куски: doFrequencyTuneSSB 0x1F2 (~498 B), updateBFO 0x7A, SI4735::setFrequency ~0xB8, applyBandConfiguration 0x598, loadSSBPatch 0x1EC.
+Вынести те же функции в Radio.cpp без нового API: при включённом -flto обычно 0±80 байт, скорость I2C не меняется.
+Класс Radio / tuning.step() / getters: типично +200…600 B за прологи, лишние вызовы и хуже inline. Запас сейчас ~656 B — «красивый» Radio Core почти наверняка съест его и не ускорит крутилку.
+Имеет смысл только механический split тех же C-функций ради чтения кода, с обязательной проверкой avr-size до/после. Не начинать, пока не нужен второй вызывающий или тест без LTO.
 
 Железо
 - Короткий энкодер: focus. Крутить: частота / focused control.

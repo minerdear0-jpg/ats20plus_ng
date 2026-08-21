@@ -476,12 +476,12 @@ void showFrequency(bool cleanDisplay = false)
 
     if (cleanDisplay || prevOff != off)
     {
-        oledPrint("/////////", 0, 3, FONT14X24SEVENSEG);
+        oledPrint("/////////", 0, UI_PAGE_FREQ, FONT14X24SEVENSEG);
         prevLine[0] = 0;
         prevOff = off;
     }
     else if (isSSB() && len > prevLen && len == 5)
-        oledPrint("   ", 102, 4, DEFAULT_FONT);
+        oledPrint("   ", 102, UI_PAGE_FREQ + 1, DEFAULT_FONT);
 
     while (line[i] && line[i] == prevLine[i])
         i++;
@@ -489,7 +489,7 @@ void showFrequency(bool cleanDisplay = false)
     {
         uint8_t oldLen = strlen8(prevLine);
         oledSetFont(FONT14X24SEVENSEG);
-        oled.setCursor(off + i * 14, 3);
+        oled.setCursor(off + i * 14, UI_PAGE_FREQ);
         oled.print(&line[i]);
         i = strlen8(line);
         while (i < oldLen)
@@ -505,7 +505,7 @@ void showFrequency(bool cleanDisplay = false)
     }
 
     if (g_Settings[SettingsIndex::UnitsSwitch].param == 1 && (!isSSB() || isSSB() && len < 5))
-        oledPrint(unit, 102, 4, DEFAULT_FONT);
+        oledPrint(unit, 102, UI_PAGE_FREQ + 1, DEFAULT_FONT);
 
     prevLen = len;
 }
@@ -542,7 +542,7 @@ void doSeek()
 
 #if USE_RDS
     if (g_displayRDS)
-        oledClearLine(6);
+        oledClearLine(UI_PAGE_SECONDARY);
 #endif
     g_seekStop = false;
     g_si4735.seekStationProgress(showFrequencySeek, checkStopSeeking, g_seekDirection);
@@ -570,7 +570,7 @@ void showStatus(bool cleanFreq)
 
 void updateLowerDisplayLine()
 {
-    oledClearLine(6);
+    oledClearLine(UI_PAGE_SECONDARY);
     showModulation();
     showStep();
     showCharge(true);
@@ -831,7 +831,7 @@ void showBandTag()
     if (g_sMeterOn || g_displayRDS)
         return;
 
-    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, 6, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
+    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, UI_PAGE_SECONDARY, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
 }
 
 //Draw volume level
@@ -915,7 +915,7 @@ void showCharge(bool forceShow)
             static uint8_t lastPct = 255;
             if (forceShow || percents != lastPct)
             {
-                oledPrint(buf, 102, 6, DEFAULT_FONT);
+                oledPrint(buf, 102, UI_PAGE_SECONDARY, DEFAULT_FONT);
                 lastPct = percents;
             }
         }
@@ -959,7 +959,7 @@ void showRDS()
             succeed = false;
         }
         g_rdsPrevLen = 0;
-        oledClearLine(6);
+        oledClearLine(UI_PAGE_SECONDARY);
     }
     lastUpdatedFreq = g_currentFrequency;
 
@@ -984,7 +984,7 @@ void showRDS()
     if (len == 0 && !g_rdsSwitchPressed)
         return;
 
-    oledPrint(g_RDSCells[g_rdsActiveInfo], 0, 6, DEFAULT_FONT);
+    oledPrint(g_RDSCells[g_rdsActiveInfo], 0, UI_PAGE_SECONDARY, DEFAULT_FONT);
     
     uint8_t toPrint = len == 0 ? 3 : (len < g_rdsPrevLen ? min(g_rdsPrevLen - len, 16 - len) : 0);
     char printChar = len == 0 ? '.' : ' ';
@@ -1049,8 +1049,8 @@ void showStep()
         paintTransient("STEP", buf);
         return;
     }
-    oledPrint("St:", off - 16, 6, DEFAULT_FONT, g_cmdStep);
-    oledPrint(buf, off + 8, 6, DEFAULT_FONT, g_cmdStep);
+    oledPrint("St:", off - 16, UI_PAGE_SECONDARY, DEFAULT_FONT, g_cmdStep);
+    oledPrint(buf, off + 8, UI_PAGE_SECONDARY, DEFAULT_FONT, g_cmdStep);
 }
 
 void showSMeter()
@@ -1100,8 +1100,8 @@ void showSMeter()
             digit = 6;
     }
 
-    // Same page: "S9+" then a solid 1px wedge (2px stems still look like a fence).
-    oled.setCursor(0, 2);
+    // Signal sits under the 7-seg (Sweet Spot: MODE → FREQ → SIGNAL).
+    oled.setCursor(0, UI_PAGE_SIGNAL);
     oled.startData();
     oledSendSmGlyph(1);
     oledSendSmGlyph(digit);
@@ -1186,7 +1186,7 @@ void showBfoIdle()
         return;
     char buf[7];
     formatBfo(buf);
-    oledPrint(buf, 80, 6, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
+    oledPrint(buf, 80, UI_PAGE_SECONDARY, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
 }
 
 void paintBfoTransient()
@@ -1323,14 +1323,14 @@ void bandSwitch(bool up)
         if (g_sMeterOn)
         {
             g_sMeterOn = false;
-            oledClearLine(6);
+            oledClearLine(UI_PAGE_SECONDARY);
         }
 
 #if USE_RDS
         if (g_displayRDS && g_currentMode != FM)
         {
             g_displayRDS = false;
-            oledClearLine(6);
+            oledClearLine(UI_PAGE_SECONDARY);
         }
 #endif
 
@@ -1711,7 +1711,7 @@ void doRDS()
     if (g_displayRDS)
     {
         g_sMeterOn = false;
-        oledClearLine(6);
+        oledClearLine(UI_PAGE_SECONDARY);
         g_si4735.getRdsStatus();
         showRDS();
     }
@@ -1846,7 +1846,7 @@ void doFrequencyTune()
         g_currentFrequency += g_tabStepFM[g_FMStepIndex] * g_encoderCount; //g_si4735.getFrequency() is too slow
 #if USE_RDS
         if (g_displayRDS)
-            oledClearLine(6);
+            oledClearLine(UI_PAGE_SECONDARY);
 #endif
     }
     else
