@@ -24,6 +24,9 @@
 #include "Utils.h"
 
 void showStatus(bool cleanFreq = false);
+void uiFlush();
+void paintTransient(const char* title, const char* value);
+void restoreIdleHeader();
 void applyBandConfiguration(bool extraSSBReset = false);
 
 bool isSSB()
@@ -555,6 +558,8 @@ void showStatus(bool cleanFreq)
     showBandwidth();
     showCharge(true);
     showVolume();
+    if (!g_settingsActive)
+        showSMeter();
 }
 
 void updateLowerDisplayLine()
@@ -763,6 +768,42 @@ void switchSettings()
 }
 
 //Draw curremt modulation
+void paintTransient(const char* title, const char* value)
+{
+    char line[17];
+    uint8_t i = 0;
+    while (title[i] && i < 6)
+    {
+        line[i] = title[i];
+        i++;
+    }
+    line[i++] = ' ';
+    uint8_t vl = 0;
+    while (value[vl] == ' ')
+        vl++;
+    const char* v = &value[vl];
+    vl = 0;
+    while (v[vl])
+        vl++;
+    uint8_t start = (vl < 16) ? (uint8_t)(16 - vl) : i;
+    if (start < i)
+        start = i;
+    while (i < start)
+        line[i++] = ' ';
+    uint8_t j = 0;
+    while (j < vl && i < 16)
+        line[i++] = v[j++];
+    while (i < 16)
+        line[i++] = ' ';
+    line[16] = 0;
+    oledSetFont(DEFAULT_FONT);
+    oled.invertOutput(true);
+    oled.setCursor(0, 0);
+    oled.print(line);
+    oled.invertOutput(false);
+    g_uiLayer = UI_LAYER_TRANSIENT;
+}
+
 void showModulation()
 {
     oledPrint(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_cmdBand && g_currentMode == FM);
@@ -798,6 +839,12 @@ void showVolume()
         buf[0] = ' ';
         buf[1] = 'M';
         buf[2] = 0;
+    }
+
+    if (g_cmdVolume && g_uiLayer == UI_LAYER_TRANSIENT)
+    {
+        paintTransient("VOL", buf);
+        return;
     }
 
     oledPrint(buf, (128 - (8 * 2) + 2 - 6), 0, DEFAULT_FONT, g_cmdVolume);
@@ -944,7 +991,10 @@ void showRDS()
 void showStep()
 {
     if (g_sMeterOn || g_displayRDS)
-        return;
+    {
+        if (!g_cmdStep)
+            return;
+    }
 
     char buf[5];
     if (g_currentMode == FM)
@@ -985,12 +1035,20 @@ void showStep()
     }
 
     uint8_t off = 50;
+    if (g_cmdStep && g_uiLayer == UI_LAYER_TRANSIENT)
+    {
+        paintTransient("STEP", buf);
+        return;
+    }
     oledPrint("St:", off - 16, 6, DEFAULT_FONT, g_cmdStep);
     oledPrint(buf, off + 8, 6, DEFAULT_FONT, g_cmdStep);
 }
 
 void showSMeter()
 {
+    if (g_settingsActive)
+        return;
+
     static uint32_t sMeterUpdated = 0;
     if (millis() - sMeterUpdated < 100)
         return;
@@ -1034,7 +1092,7 @@ void showSMeter()
     }
 
     // Same page: "S9+" then a solid 1px wedge (2px stems still look like a fence).
-    oled.setCursor(0, 6);
+    oled.setCursor(0, 2);
     oled.startData();
     oledSendSmGlyph(1);
     oledSendSmGlyph(digit);
@@ -1072,7 +1130,104 @@ void showBandwidth()
         bw = (char*)g_bandwidthFM[g_bwIndexFM];
     }
 
+    if (g_cmdBw && g_uiLayer == UI_LAYER_TRANSIENT)
+    {
+        paintTransient("BW", bw);
+        return;
+    }
     oledPrint(bw, 45, 0, DEFAULT_FONT, g_cmdBw);
+}
+
+void restoreIdleHeader()
+{
+    g_uiLayer = UI_LAYER_NORMAL;
+    oled.setCursor(0, 0);
+    oled.fillLength(0, 128);
+    oled.setCursor(0, 1);
+    oled.fillLength(0, 128);
+    showModulation();
+    showVolume();
+    showBandwidth();
+}
+
+void paintBfoTransient()
+{
+    char buf[7];
+    int16_t b = g_currentBFO;
+    buf[0] = (b < 0) ? '-' : '+';
+    if (b < 0)
+        b = -b;
+    convertToChar(&buf[1], (uint16_t)b, 5);
+    buf[6] = 0;
+    paintTransient("BFO", buf);
+}
+
+void cycleEncoderFocus()
+{
+    uint8_t next = g_uiFocus + 1;
+    if (next == FOCUS_BFO && !isSSB())
+        next++;
+    if (next > FOCUS_BFO)
+        next = FOCUS_FREQ;
+
+    g_cmdStep = false;
+    g_cmdVolume = false;
+    g_cmdBw = false;
+    g_cmdBand = false;
+    restoreIdleHeader();
+    g_uiFocus = next;
+    showStep();
+    showVolume();
+
+    if (next == FOCUS_FREQ)
+    {
+        g_lastAdjustmentTime = 0;
+        return;
+    }
+
+    g_lastAdjustmentTime = millis();
+    if (next == FOCUS_STEP)
+    {
+        g_uiLayer = UI_LAYER_FOCUS;
+        g_cmdStep = true;
+        showStep();
+    }
+    else if (next == FOCUS_VOL)
+    {
+        g_uiLayer = UI_LAYER_FOCUS;
+        g_cmdVolume = true;
+        showVolume();
+    }
+    else
+    {
+        g_uiLayer = UI_LAYER_TRANSIENT;
+        paintBfoTransient();
+    }
+}
+
+void uiFlush()
+{
+    if (!g_uiDirty || g_settingsActive)
+    {
+        g_uiDirty = 0;
+        g_uiFreqClean = false;
+        return;
+    }
+    if (g_uiDirty & UI_FREQ)
+        showFrequency(g_uiFreqClean);
+    if (g_uiLayer != UI_LAYER_TRANSIENT)
+    {
+        if (g_uiDirty & UI_MOD)
+            showModulation();
+        if (g_uiDirty & UI_VOL)
+            showVolume();
+        if (g_uiDirty & UI_BW)
+            showBandwidth();
+    }
+    if (g_uiDirty & UI_STEP)
+        showStep();
+    g_uiDirty = 0;
+    g_uiFreqClean = false;
 }
 
 uint16_t getNextSWSuBband(bool up)
@@ -1569,6 +1724,8 @@ void switchCommand(bool* b, void (*showFunction)())
             if (prevFunc)
                 prevFunc();
             g_lastAdjustmentTime = 0;
+            restoreIdleHeader();
+            g_uiFocus = FOCUS_FREQ;
             prev = NULL;
         }
         return;
@@ -1594,6 +1751,9 @@ void switchCommand(bool* b, void (*showFunction)())
         g_lastAdjustmentTime = 0;
 
     *b = !last;
+
+    if (*b)
+        g_uiLayer = UI_LAYER_FOCUS;
 
     if (showFunction)
         showFunction();
@@ -1663,7 +1823,7 @@ void doFrequencyTune()
     g_processFreqChange = true;
     g_lastFreqChange = millis();
 
-    showFrequency();
+    uiMark(UI_FREQ);
 }
 
 void resetLowerLine()
@@ -1706,8 +1866,8 @@ void doFrequencyTuneSSB()
     g_processFreqChange = true;
     g_lastFreqChange = millis();
     g_previousFrequency = 0; //Force EEPROM update
-    if (!clampSSBBand()) //If we move outside of current band - switch it
-        showFrequency();
+    if (!clampSSBBand())
+        uiMark(UI_FREQ);
 }
 
 // OLED already shows requested tune; push SI4735 after the encoder burst settles.
@@ -1771,11 +1931,20 @@ void loop()
             }
         }
         else if (g_cmdVolume)
+        {
+            g_uiLayer = UI_LAYER_TRANSIENT;
             doVolume(g_encoderCount);
+        }
         else if (g_cmdStep)
+        {
+            g_uiLayer = UI_LAYER_TRANSIENT;
             doStep(g_encoderCount);
+        }
         else if (g_cmdBw)
+        {
+            g_uiLayer = UI_LAYER_TRANSIENT;
             doBandwidth(g_encoderCount);
+        }
         else if (g_cmdBand)
         {
             if (g_encoderCount > 0)
@@ -1783,17 +1952,26 @@ void loop()
             else
                 bandSwitch(false);
         }
+        else if (g_uiFocus == FOCUS_BFO && isSSB())
+        {
+            g_uiLayer = UI_LAYER_TRANSIENT;
+            doFrequencyTuneSSB();
+            paintBfoTransient();
+        }
         else if (isSSB())
             doFrequencyTuneSSB();
         else
             doFrequencyTune();
         g_encoderCount = 0;
         resetEepromDelay();
+        uiFlush();
         goto saveAttempt;
     }
 
     if (g_processFreqChange && (millis() - g_lastFreqChange >= FREQ_COMMIT_MS))
         commitRadioFrequency();
+
+    uiFlush();
 
     if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
     {
@@ -1801,7 +1979,7 @@ void loop()
         showRDS();
 #endif
 
-        if (g_sMeterOn && !g_settingsActive)
+        if (!g_settingsActive)
             showSMeter();
 
         showCharge(false);
@@ -1858,45 +2036,22 @@ void loop()
             showVolume();
         }
     }
-    if (BUTTONEVENT_SHORTPRESS == btn_Encoder.checkEvent(simpleEvent))
+    uint8_t encEvent = btn_Encoder.checkEvent(simpleEvent);
+    if (BUTTONEVENT_SHORTPRESS == encEvent)
     {
-        if (g_cmdBand)
-        {
-            g_cmdBand = false;
-            showModulation();
-        }
-        else if (g_cmdStep)
-        {
-            g_cmdStep = false;
-            showStep();
-        }
-        else if (g_cmdBw)
-        {
-            g_cmdBw = false;
-            showBandwidth();
-        }
-        else if (g_cmdVolume)
-        {
-            g_cmdVolume = false;
-            showVolume();
-        }
-        else if (g_settingsActive)
+        if (g_settingsActive)
         {
             g_SettingEditing = !g_SettingEditing;
             DrawSetting(g_SettingSelected, true);
         }
         else if (g_displayRDS)
             g_rdsSwitchPressed = true;
-        else if (isSSB() || g_Settings[SettingsIndex::ScanSwitch].param == 0)
-        {
-            if (!g_settingsActive)
-            {
-                switchCommand(&g_cmdStep, showStep);
-                resetLowerLine();
-            }
-        }
-        //Seek in SSB/CW is not allowed
-        else if (g_currentMode == FM || g_currentMode == AM)
+        else
+            cycleEncoderFocus();
+    }
+    else if (BUTTONEVENT_LONGPRESSDONE == encEvent)
+    {
+        if (!g_settingsActive && (g_currentMode == FM || g_currentMode == AM))
             doSeek();
     }
 
@@ -1937,16 +2092,8 @@ void loop()
     {
         if (!g_settingsActive)
         {
-            g_sMeterOn = !g_sMeterOn;
-            if (g_sMeterOn)
-            {
-                g_displayRDS = false;
-                g_sMeterDrawnVal = 255;
-                oledClearLine(6);
-                showSMeter();
-            }
-            else
-                updateLowerDisplayLine();
+            g_sMeterDrawnVal = 255;
+            showSMeter();
         }
     }
     if (BUTTONEVENT_SHORTPRESS == btn_Mode.checkEvent(simpleEvent))

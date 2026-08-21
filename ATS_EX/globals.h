@@ -11,6 +11,41 @@ bool g_cmdStep = false;
 bool g_cmdBw = false;
 bool g_cmdBand = false;
 bool g_settingsActive = false;
+
+enum UiLayer : uint8_t
+{
+    UI_LAYER_NORMAL = 0,
+    UI_LAYER_FOCUS,
+    UI_LAYER_TRANSIENT
+};
+
+enum UiDirty : uint8_t
+{
+    UI_FREQ = 1 << 0,
+    UI_MOD  = 1 << 1,
+    UI_STEP = 1 << 2,
+    UI_BW   = 1 << 3,
+    UI_VOL  = 1 << 4
+};
+uint8_t g_uiDirty = 0;
+bool g_uiFreqClean = false;
+uint8_t g_uiLayer = 0;
+uint8_t g_uiFocus = 0;
+
+enum UiFocus : uint8_t
+{
+    FOCUS_FREQ = 0,
+    FOCUS_STEP,
+    FOCUS_VOL,
+    FOCUS_BFO
+};
+
+inline void uiMark(uint8_t bits, bool freqClean = false)
+{
+    g_uiDirty |= bits;
+    if (freqClean)
+        g_uiFreqClean = true;
+}
 bool g_sMeterOn = false;
 uint8_t g_sMeterDrawnVal = 255;
 bool g_displayOn = true;

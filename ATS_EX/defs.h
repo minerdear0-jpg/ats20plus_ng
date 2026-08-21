@@ -48,14 +48,15 @@
 #define FREQ_COMMIT_MS 70
 #define BACKGROUND_UI_MS 1000
 // Runtime I2C after SSB patch download (patch itself stays at 500 kHz).
-#define I2C_RUN_HZ 400000L
+// 400000 is the next-gen candidate; leave 100000 until the board confirms 400 kHz is stable.
+#define I2C_RUN_HZ 100000L
 
 // IARU S-meter: Si473x RSSI is dBµV. S9 = 50 µV = 34 dBµV, 6 dB per S-unit.
 #define S9_DBUV 34
 #define SMETER_MAX_OVER_S9 60
 #define SMETER_SEGMENTS 16
 #define DEFAULT_VOLUME 25
-#define ADJUSTMENT_ACTIVE_TIMEOUT 3000
+#define ADJUSTMENT_ACTIVE_TIMEOUT 1500
 
 // Band settings
 #define SW_LIMIT_LOW		1710
