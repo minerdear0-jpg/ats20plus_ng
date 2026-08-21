@@ -18,7 +18,7 @@ I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — жд
 - S-метр всегда под частотой (page 5); 7-seg pages 2–4. Порядок MODE → FREQ → SIGNAL.
 - SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
 - FM: «ST» при пилоте; RDS-строка включена при входе на FM (MODE её снимает/ставит). Энкодер на FM не переключает ячейки RDS — только focus.
-- Splash v1.19.
+- Splash v2.0b, (C) OOMAN / Cursor 2026.
 
 Компромиссы
 - Одна secondary-строка (page 6), не две как на макете Sweet Spot.

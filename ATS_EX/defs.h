@@ -10,7 +10,7 @@
 #define EEPROM_APP_ID_ADDRESS       0
 
 // Splash / about string. APP_VERSION below is EEPROM layout, not this.
-#define FW_VERSION_STR "1.19"
+#define FW_VERSION_STR "2.0b"
 
 //EEPROM Settings
 #define STORE_TIME 10000 // Inactive time to save our settings

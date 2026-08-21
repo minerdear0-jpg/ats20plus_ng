@@ -147,8 +147,8 @@ void setup()
     {
         oledPrint(" ATS-20 RECEIVER", 0, 0, DEFAULT_FONT, true);
         oledPrint("ATS_EX v" FW_VERSION_STR, 16, 2);
-        oledPrint("by Goshante 2026", 0, 4);
-        oledPrint("OOMAN and Cursor", 0, 6);
+        oledPrint("(C) OOMAN   2026", 0, 4);
+        oledPrint("(C) Cursor  2026", 0, 6);
         delay(2000);
     }
     oled.clear();
