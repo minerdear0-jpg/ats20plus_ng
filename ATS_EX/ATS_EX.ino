@@ -406,35 +406,35 @@ void resetEepromDelay()
     g_previousFrequency = 0;
 }
 
-//Draw frequency. 
+//Draw frequency.
 //BFO and main frequency produce actual frequency that is displayed on LCD
-//Too sensitive logic, do not change
+//I2C: reprint 7-seg from the first glyph that changed ('/' blanks a slot).
 void showFrequency(bool cleanDisplay = false)
 {
     if (g_settingsActive)
         return;
 
     char unit[4];
-    char freqDisplay[7];
-    char ssbSuffix[4];
+    char line[8];
+    static char prevLine[8];
     static uint8_t prevLen = 0;
-    uint16_t khzBFO, tailBFO;
+    static uint8_t prevOff = 255;
+    uint16_t khzBFO = 0, tailBFO = 0;
     uint8_t off = (isSSB() ? -5 : 4) + 8;
+    uint8_t i = 0;
+    uint8_t len;
 
     unit[0] = 'k';
     unit[1] = 'H';
     unit[2] = 'z';
     unit[3] = 0x0;
-
-    ssbSuffix[0] = '.';
-    ssbSuffix[1] = '0';
-    ssbSuffix[2] = '0';
-    ssbSuffix[3] = '\0';
+    line[0] = 0;
 
     if (g_bandIndex == FM_BAND_TYPE)
     {
-        convertToChar(freqDisplay, g_currentFrequency, 5, 3, '.', '/');
+        convertToChar(line, g_currentFrequency, 5, 3, '.', '/');
         unit[0] = 'M';
+        len = ilen(g_currentFrequency);
     }
     else
     {
@@ -444,42 +444,58 @@ void showFrequency(bool cleanDisplay = false)
         if (!isSSB())
         {
             bool swMhz = g_Settings[SettingsIndex::SWUnits].param == 1;
-            convertToChar(freqDisplay, g_currentFrequency, 5, (g_bandIndex == SW_BAND_TYPE && swMhz) ? 2 : 0, '.', '/');
+            convertToChar(line, g_currentFrequency, 5, (g_bandIndex == SW_BAND_TYPE && swMhz) ? 2 : 0, '.', '/');
             if (g_bandIndex == SW_BAND_TYPE && swMhz)
                 unit[0] = 'M';
+            len = ilen(g_currentFrequency);
         }
         else
         {
             splitFreq(khzBFO, tailBFO);
-            //utoa(freqDisplay, khzBFO);
-            convertToChar(freqDisplay, khzBFO, ilen(khzBFO));
+            len = ilen(khzBFO);
+            uint8_t tailLen = ilen(tailBFO);
+            convertToChar(line, khzBFO, len);
+            line[len] = '.';
+            line[len + 1] = '0';
+            line[len + 2] = '0';
+            convertToChar((tailLen == 1) ? &line[len + 2] : &line[len + 1], tailBFO, tailLen);
+            line[len + 3] = 0;
         }
     }
 
-    uint8_t len = isSSB() ? ilen(khzBFO) : ilen(g_currentFrequency);
-    if (cleanDisplay)
+    if (cleanDisplay || prevOff != off)
     {
-        oled.setCursor(0, 3);
-        oledPrint("/////////", 0, 3, FONT14X24SEVENSEG); // This character is an empty space in my seven seg font.
+        oledPrint("/////////", 0, 3, FONT14X24SEVENSEG);
+        prevLine[0] = 0;
+        prevOff = off;
     }
     else if (isSSB() && len > prevLen && len == 5)
         oledPrint("   ", 102, 4, DEFAULT_FONT);
 
-    oledPrint(freqDisplay, off, 3, FONT14X24SEVENSEG);
-
-    if (isSSB())
+    while (line[i] && line[i] == prevLine[i])
+        i++;
+    if (line[i] || prevLine[i])
     {
-        //utoa((ilen(tailBFO) == 1) ? &ssbSuffix[2] : &ssbSuffix[1], tailBFO);
-        convertToChar((ilen(tailBFO) == 1) ? &ssbSuffix[2] : &ssbSuffix[1], tailBFO, ilen(tailBFO));
-        ssbSuffix[3] = 0;
-        oledPrint(ssbSuffix);
-        if (len != prevLen && len < prevLen)
-            oledPrint("/");
+        uint8_t oldLen = strlen8(prevLine);
+        oledSetFont(FONT14X24SEVENSEG);
+        oled.setCursor(off + i * 14, 3);
+        oled.print(&line[i]);
+        i = strlen8(line);
+        while (i < oldLen)
+        {
+            oled.write((uint8_t)'/');
+            i++;
+        }
+        i = 0;
+        do
+        {
+            prevLine[i] = line[i];
+        } while (line[i++]);
     }
 
     if (g_Settings[SettingsIndex::UnitsSwitch].param == 1 && (!isSSB() || isSSB() && len < 5))
         oledPrint(unit, 102, 4, DEFAULT_FONT);
-        
+
     prevLen = len;
 }
 
@@ -810,36 +826,17 @@ void showCharge(bool forceShow)
     static int16_t averageSamples = 0;
 
     int sample = analogRead(BATTERY_VOLTAGE_PIN);
-    if (sample < 0)
-        sample = averageSamples;
 
     if ((millis() - lastChargeShow) > 10000 || forceShow)
     {
         uint16_t currentSamples = (uint16_t)averageSamples;
         uint8_t percents = 0;
-        uint16_t v0 = pgm_read_word(&dischargeTable[0][0]);
-        uint16_t vLast = pgm_read_word(&dischargeTable[rows - 1][0]);
-
-        if (currentSamples >= v0)
-            percents = 100;
-        else if (currentSamples <= vLast)
-            percents = 0;
-        else
+        for (uint8_t i = 0; i < rows; i++)
         {
-            for (uint8_t i = 0; i < rows - 1; ++i)
+            if (currentSamples >= pgm_read_word(&dischargeTable[i][0]))
             {
-                uint16_t vHi = pgm_read_word(&dischargeTable[i][0]);
-                uint16_t vLo = pgm_read_word(&dischargeTable[i + 1][0]);
-                if (currentSamples >= vLo && currentSamples <= vHi)
-                {
-                    uint16_t pHi = pgm_read_word(&dischargeTable[i][1]);
-                    uint16_t pLo = pgm_read_word(&dischargeTable[i + 1][1]);
-                    uint16_t voltageDiff = vHi - vLo;
-                    uint16_t percentageDiff = pHi - pLo;
-                    uint16_t voltageOffset = currentSamples - vLo;
-                    percents = (uint8_t)(pLo + (percentageDiff * voltageOffset + voltageDiff / 2) / voltageDiff);
-                    break;
-                }
+                percents = (uint8_t)pgm_read_word(&dischargeTable[i][1]);
+                break;
             }
         }
 
