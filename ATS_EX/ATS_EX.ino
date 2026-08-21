@@ -63,6 +63,80 @@ int getLastStep()
 #define APP_VERSION 118
 
 //Initialize controller
+// Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
+void pinMode(uint8_t pin, uint8_t mode)
+{
+    volatile uint8_t* ddr;
+    volatile uint8_t* port;
+    uint8_t bit;
+    if (pin < 8)
+    {
+        ddr = &DDRD;
+        port = &PORTD;
+        bit = pin;
+    }
+    else if (pin < 14)
+    {
+        ddr = &DDRB;
+        port = &PORTB;
+        bit = pin - 8;
+    }
+    else
+    {
+        ddr = &DDRC;
+        port = &PORTC;
+        bit = pin - 14;
+    }
+    if (mode == OUTPUT)
+        *ddr |= (1 << bit);
+    else
+    {
+        *ddr &= ~(1 << bit);
+        if (mode == INPUT_PULLUP)
+            *port |= (1 << bit);
+        else
+            *port &= ~(1 << bit);
+    }
+}
+
+void digitalWrite(uint8_t pin, uint8_t val)
+{
+    if (pin < 8)
+    {
+        if (val)
+            PORTD |= (1 << pin);
+        else
+            PORTD &= ~(1 << pin);
+    }
+    else if (pin < 14)
+    {
+        pin -= 8;
+        if (val)
+            PORTB |= (1 << pin);
+        else
+            PORTB &= ~(1 << pin);
+    }
+    else
+    {
+        pin -= 14;
+        if (val)
+            PORTC |= (1 << pin);
+        else
+            PORTC &= ~(1 << pin);
+    }
+}
+
+int analogRead(uint8_t pin)
+{
+    if (pin >= 14)
+        pin -= 14;
+    ADMUX = (1 << REFS0) | (pin & 7);
+    ADCSRA |= (1 << ADSC);
+    while (ADCSRA & (1 << ADSC))
+        ;
+    return ADC;
+}
+
 void setup()
 {
     //We need to save more space with this
@@ -85,11 +159,8 @@ void setup()
         saveAllReceiverInformation();
         oled.print("  EEPROM RESET");
         oled.setCursor(0, 2);
-        for (uint8_t i = 0; i < 16; i++)
-        {
-            oled.print("-"); //Just fancy animation
-            delay(60);
-        }
+        oled.print("----------------");
+        delay(960);
     }
     else
     {
@@ -630,9 +701,12 @@ void showSettingsTitle()
 {
     oledPrint("   SETTINGS  ", 0, 0, DEFAULT_FONT, true);
     oled.invertOutput(true);
-    oled.print(uint8_t(g_SettingsPage));
-    oled.print("/");
-    oled.print(uint8_t(g_SettingsMaxPages));
+    char pg[4];
+    pg[0] = '0' + g_SettingsPage;
+    pg[1] = '/';
+    pg[2] = '0' + g_SettingsMaxPages;
+    pg[3] = 0;
+    oled.print(pg);
     oled.invertOutput(false);
 }
 
@@ -914,32 +988,49 @@ void showSMeter()
 
     g_si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = g_si4735.getCurrentRSSI();
-    uint8_t blocks;
+    uint8_t sUnit;
+    uint8_t plusDb = 0;
     if (rssi >= S9_DBUV)
     {
-        blocks = 9 + (rssi - S9_DBUV) / 10;
-        if (blocks > SMETER_SEGMENTS)
-            blocks = SMETER_SEGMENTS;
+        sUnit = 9;
+        plusDb = rssi - S9_DBUV;
+        if (plusDb > SMETER_MAX_OVER_S9)
+            plusDb = SMETER_MAX_OVER_S9;
     }
     else
     {
-        blocks = (uint8_t)((rssi + 20) / 6);
-        if (blocks > 9)
-            blocks = 9;
+        sUnit = (uint8_t)((rssi + 20) / 6);
+        if (sUnit > 9)
+            sUnit = 9;
     }
 
-    for (uint8_t page = 6; page < 8; page++)
+    uint8_t blocks = sUnit + (plusDb / 10);
+    if (blocks > SMETER_SEGMENTS)
+        blocks = SMETER_SEGMENTS;
+
+    oled.setCursor(0, 6);
+    oled.fillLength(0, 128);
+    oledDraw6x8(0, 6, SMETER_GLYPH_S);
+    oledDraw6x8(64, 6, SMETER_GLYPH_DIGIT + 9);
+    oledDraw6x8(112, 6, SMETER_GLYPH_PLUS);
+
+    if (plusDb == 0)
+        oledDraw6x8(76, 6, SMETER_GLYPH_DIGIT + sUnit);
+    else
     {
-        oled.setCursor(0, page);
-        uint8_t empty = (page == 6) ? 0x01 : 0x80;
-        oled.startData();
-        for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
-        {
-            oled.repeatData((i < blocks) ? 0xFF : empty, 6);
-            oled.repeatData(0, 2);
-        }
-        oled.endData();
+        oledDraw6x8(76, 6, SMETER_GLYPH_PLUS);
+        oledDraw6x8(83, 6, SMETER_GLYPH_DIGIT + (plusDb / 10));
+        oledDraw6x8(90, 6, SMETER_GLYPH_DIGIT + (plusDb % 10));
     }
+
+    oled.setCursor(0, 7);
+    oled.startData();
+    for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
+    {
+        oled.repeatData((i < blocks) ? 0xFF : 0x80, 6);
+        oled.repeatData(0, 2);
+    }
+    oled.endData();
 }
 
 //Draw bandwidth (Ignored for CW mode)
