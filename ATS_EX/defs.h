@@ -9,6 +9,9 @@
 #define EEPROM_VERSION_ADDRESS      1000
 #define EEPROM_APP_ID_ADDRESS       0
 
+// Splash / about string. APP_VERSION below is EEPROM layout, not this.
+#define FW_VERSION_STR "1.19"
+
 //EEPROM Settings
 #define STORE_TIME 10000 // Inactive time to save our settings
 
@@ -23,6 +26,8 @@
 // Encoder
 #define ENCODER_PIN_A 2
 #define ENCODER_PIN_B 3
+// Unconsumed ticks between loop() passes. Caps int8_t, still lets a fast spin count as many steps.
+#define ENCODER_MAX_BURST 20
 
 // Buttons
 #define MODE_SWITCH       4 

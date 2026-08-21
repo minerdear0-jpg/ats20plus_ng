@@ -5,8 +5,7 @@
 // For more information check README file in my github repository:
 // http://github.com/goshante/ats20_ats_ex
 // ----------------------------------------------------------------------
-// By Goshante
-// 02.2024
+// By Goshante, 2024. Co-authors: OOMAN and Cursor, 2026.
 // http://github.com/goshante
 // ----------------------------------------------------------------------
 
@@ -165,8 +164,9 @@ void setup()
     else
     {
         oledPrint(" ATS-20 RECEIVER", 0, 0, DEFAULT_FONT, true);
-        oledPrint("ATS_EX v1.18", 16, 2);
-        oledPrint("Goshante 2024", 12, 4);
+        oledPrint("ATS_EX v" FW_VERSION_STR, 16, 2);
+        oledPrint("by Goshante 2026", 0, 4);
+        oledPrint("OOMAN and Cursor", 0, 6);
         delay(2000);
     }
     oled.clear();
@@ -302,7 +302,13 @@ void rotaryEncoder()
     uint8_t encoderStatus = g_encoder.process();
     if (encoderStatus)
     {
-        g_encoderCount = (encoderStatus == DIR_CW) ? 1 : -1;
+        if (encoderStatus == DIR_CW)
+        {
+            if (g_encoderCount < ENCODER_MAX_BURST)
+                g_encoderCount++;
+        }
+        else if (g_encoderCount > -ENCODER_MAX_BURST)
+            g_encoderCount--;
         g_seekStop = true;
     }
 }
@@ -1016,7 +1022,7 @@ void showSMeter()
             digit = 6;
     }
 
-    // Same OLED page: "S9+" then a 2px ramp (wide 8px columns look like a fence).
+    // Same page: "S9+" then a solid 1px wedge (2px stems still look like a fence).
     oled.setCursor(0, 6);
     oled.startData();
     oledSendSmGlyph(1);
@@ -1025,20 +1031,15 @@ void showSMeter()
     oled.sendData(0);
     oled.sendData(0);
 
-    const uint8_t ramp = 57;
+    const uint8_t ramp = 114;
     uint8_t filled = (uint8_t)((uint16_t)val * ramp / 15);
-    for (uint8_t i = 0; i < ramp; i++)
+    for (uint8_t x = 0; x < ramp; x++)
     {
-        uint8_t h = 1 + (uint8_t)((uint16_t)i * 7 / (ramp - 1));
-        uint8_t bar = (h >= 8) ? 0xFF : (uint8_t)(~(0xFFu << h));
-        uint8_t pix = (i < filled) ? bar : 0x01;
-        oled.sendData(pix);
-        oled.sendData(pix);
+        uint8_t h = 1 + (uint8_t)((uint16_t)x * 7 / (ramp - 1));
+        uint8_t slope = (h >= 8) ? 0xFF : (uint8_t)(0xFFu << (8 - h));
+        oled.sendData((x < filled) ? slope : 0x80);
     }
     oled.endData();
-
-    oled.setCursor(0, 7);
-    oled.fillLength(0, 128);
 }
 
 //Draw bandwidth (Ignored for CW mode)
@@ -1257,7 +1258,7 @@ void doStep(int8_t v)
 {
     if (g_currentMode == FM)
     {
-        g_FMStepIndex = (v == 1) ? g_FMStepIndex + 1 : g_FMStepIndex - 1;
+        g_FMStepIndex = (v > 0) ? g_FMStepIndex + 1 : g_FMStepIndex - 1;
         if (g_FMStepIndex > g_lastStepFM)
             g_FMStepIndex = 0;
         else if (g_FMStepIndex < 0)
@@ -1270,7 +1271,7 @@ void doStep(int8_t v)
     }
     else
     {
-        g_stepIndex = (v == 1) ? g_stepIndex + 1 : g_stepIndex - 1;
+        g_stepIndex = (v > 0) ? g_stepIndex + 1 : g_stepIndex - 1;
         if (g_stepIndex > getLastStep())
             g_stepIndex = 0;
         else if (g_stepIndex < 0)
@@ -1278,14 +1279,14 @@ void doStep(int8_t v)
 
         //SSB Step limit
         else if (isSSB() && g_stepIndex >= g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
-            g_stepIndex = v == 1 ? g_amTotalSteps : g_amTotalStepsSSB - 1;
+            g_stepIndex = v > 0 ? g_amTotalSteps : g_amTotalStepsSSB - 1;
         
         //LW/MW Step limit
         else if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
-            && v == 1 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
+            && v > 0 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
             g_stepIndex = g_amTotalSteps;
         else if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
-            && v != 1 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
+            && v < 0 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
             g_stepIndex = g_amTotalStepsSSB;
 
         if (!isSSB() || isSSB() && g_stepIndex < g_amTotalSteps)
@@ -1316,10 +1317,14 @@ void doVolume(int8_t v)
     }
     else
     {
-        if (v == 1)
-            g_si4735.volumeUp();
-        else
-            g_si4735.volumeDown();
+        uint8_t steps = (v > 0) ? v : -v;
+        while (steps--)
+        {
+            if (v > 0)
+                g_si4735.volumeUp();
+            else
+                g_si4735.volumeDown();
+        }
     }
     showVolume();
 }
@@ -1619,7 +1624,7 @@ bool clampSSBBand()
 
 void doFrequencyTune()
 {
-    g_seekDirection = g_encoderCount == 1 ? 1 : 0;
+    g_seekDirection = g_encoderCount > 0 ? 1 : 0;
 
     //Update frequency
     g_previousFrequency = g_currentFrequency; //Force EEPROM update
@@ -1663,7 +1668,7 @@ void resetLowerLine()
 void doFrequencyTuneSSB()
 {
     const int BFOMax = 16000;
-    int step = g_encoderCount == 1 ? getSteps() : getSteps() * -1;
+    int step = getSteps() * g_encoderCount;
     int newBFO = g_currentBFO + step;
     int redundant = 0;
 
@@ -1780,7 +1785,7 @@ void loop()
             doBandwidth(g_encoderCount);
         else if (g_cmdBand)
         {
-            if (g_encoderCount == 1)
+            if (g_encoderCount > 0)
                 bandSwitch(true);
             else
                 bandSwitch(false);

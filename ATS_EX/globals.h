@@ -32,7 +32,7 @@ SimpleButton  btn_AGC(AGC_BUTTON);
 SimpleButton  btn_Step(STEP_BUTTON);
 SimpleButton  btn_Mode(MODE_SWITCH);
 
-volatile int g_encoderCount = 0;
+volatile int8_t g_encoderCount = 0;
 
 //Frequency tracking
 uint16_t g_currentFrequency;
