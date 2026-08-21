@@ -1,0 +1,34 @@
+ATS-20 UI — карта 128×64 (текущая прошивка, не pixel-perfect макет)
+
+OLED: 128×64, 8 страниц по 8 px. Шрифт UI 8×16 = 2 страницы на строку. Частота FONT14X24 = 3 страницы.
+
+Колонки 8×16 (16 знакомест): 0………7 8………15
+
+SSB idle (NORMAL)
+page 0-1: MODE (LSB/USB/CW + Sync S)     VOL nn
+page 2:   S-meter wedge (S / digit / + / ramp)
+page 3-5: 7-seg частота (герой)
+page 6-7: BAND   St:xxxx          ±BFO
+
+FM idle (NORMAL)
+page 0-1: FM          [ST]        VOL nn     BW если не transient
+page 2:   S-meter
+page 3-5: 7-seg MHz
+page 6-7: RDS PS/RT (по умолчанию вкл)  — STEP скрыт, пока RDS линия
+          MODE на FM переключает RDS ↔ нижняя служебная строка
+
+FOCUS (клик энкодера, без поворота)
+STEP/VOL: тот же слот, invert (заливка)
+BFO: invert на ±BFO (page 6)
+
+TRANSIENT (поворот focused control)
+page 0-1: инверт 16 символов  TITLE…………VALUE
+page 2-7: как idle (частота и S-метр не стираются)
+
+AM idle
+как SSB без BFO; page 6 BAND + St; заряд % справа если нет SSB
+
+Кнопки vs слои
+STEP/VOL/BW → FOCUS, поворот → TRANSIENT, 1.5 с → NORMAL
+Длинный энкодер AM/FM → seek
+MODE на FM → RDS линия on/off (ячейки PS/RT пока не крутятся энкодером — энкодер всегда focus)

@@ -4,7 +4,7 @@ long g_storeTime = millis();
 
 bool g_voltagePinConnnected = false;
 bool g_ssbLoaded = false;
-bool g_fmStereo = true;
+bool g_fmStereo = false;
 
 bool g_cmdVolume = false;
 bool g_cmdStep = false;

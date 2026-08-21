@@ -562,6 +562,10 @@ void showStatus(bool cleanFreq)
     showBfoIdle();
     if (!g_settingsActive)
         showSMeter();
+#if USE_RDS
+    if (g_currentMode == FM && g_displayRDS)
+        showRDS();
+#endif
 }
 
 void updateLowerDisplayLine()
@@ -815,6 +819,8 @@ void showModulation()
         oledPrint("S", -1, -1, LastFont, true);
     else
         oled.print(" ");
+    if (g_currentMode == FM)
+        oledPrint(g_fmStereo ? "ST" : "  ", 88, 0, DEFAULT_FONT);
 
     showBandTag();
 }
@@ -1112,6 +1118,17 @@ void showSMeter()
         oled.sendData((x < filled) ? slope : 0x80);
     }
     oled.endData();
+
+    if (g_currentMode == FM)
+    {
+        bool st = g_si4735.getCurrentPilot();
+        if (st != g_fmStereo)
+        {
+            g_fmStereo = st;
+            if (g_uiLayer == UI_LAYER_NORMAL)
+                oledPrint(g_fmStereo ? "ST" : "  ", 88, 0, DEFAULT_FONT);
+        }
+    }
 }
 
 //Draw bandwidth (Ignored for CW mode)
@@ -1370,6 +1387,9 @@ void applyBandConfiguration(bool extraSSBReset = false)
         g_bwIndexFM = g_bandList[g_bandIndex].bandwidthIdx;
         g_si4735.setFmBandwidth(g_bwIndexFM);
         g_si4735.setFMDeEmphasis(g_Settings[SettingsIndex::DeEmp].param == 0 ? 1 : 2);
+#if USE_RDS
+        g_displayRDS = true;
+#endif
     }
     else
     {
@@ -1419,6 +1439,9 @@ void applyBandConfiguration(bool extraSSBReset = false)
         g_si4735.setAvcAmMaxGain(g_Settings[SettingsIndex::AutoVolControl].param);
         g_si4735.setSeekAmLimits(minFreq, maxFreq);
         g_si4735.setSeekAmSpacing((g_bandList[g_bandIndex].currentStepIdx >= g_amTotalSteps) ? 1 : g_tabStep[g_bandList[g_bandIndex].currentStepIdx]);
+#if USE_RDS
+        g_displayRDS = false;
+#endif
     }
 
     g_currentFrequency = g_bandList[g_bandIndex].currentFreq;
@@ -2061,8 +2084,6 @@ void loop()
             g_SettingEditing = !g_SettingEditing;
             DrawSetting(g_SettingSelected, true);
         }
-        else if (g_displayRDS)
-            g_rdsSwitchPressed = true;
         else
             cycleEncoderFocus();
     }

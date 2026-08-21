@@ -4,7 +4,7 @@ ATS-20Plus_next — журнал
 Железо цели: Arduino Uno, ATmega328P, 32256 flash / 2048 SRAM.
 I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — ждать подтверждения на плате. Патч SSB по-прежнему 500 kHz.
 
-Опора: три файла спецификаций в этом каталоге. UI — Sweet Spot.
+Опора: спецификации в этом каталоге + ATS-20_UI_pixel_grid.txt (факт экрана). UI — Sweet Spot.
 
 Сделано
 - Encoder burst, ISR короткий, loop: input first.
@@ -12,38 +12,29 @@ I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — жд
 - Нет delay() на крутилке и в seek-колбэке.
 - RDS / S-метр / заряд не ходят по I2C, пока крутится encoder.
 - Dirty mark/flush для частоты.
-- Слои UI_LAYER_NORMAL / FOCUS / TRANSIENT.
-- Клик энкодера: частота → STEP → VOL → BFO (SSB) → частота.
-- Поворот focused control: залитая верхняя полоса 16×128 (paintTransient).
-- Timeout 1.5 с → idle header.
-- Seek AM/FM: длинное нажатие энкодера (короткое больше не seek).
-- S-метр постоянно на OLED page 2 (не перекрывает STEP).
-- Splash v1.19, соавторы OOMAN and Cursor.
+- Слои NORMAL / FOCUS / TRANSIENT; клик энкодера: Freq → STEP → VOL → BFO (SSB).
+- Transient: залитая верхняя полоса; timeout 1.5 с.
+- Seek AM/FM: длинное нажатие энкодера.
+- S-метр всегда page 2.
+- SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
+- FM: «ST» при пилоте; RDS-строка включена при входе на FM (MODE её снимает/ставит). Энкодер на FM не переключает ячейки RDS — только focus.
+- Splash v1.19.
 
-Компромиссы относительно Sweet Spot
-- Нет второй строки secondary (BFO+VOL как на макете): VOL на page 0, STEP на page 6.
-- Нет pixel-perfect сетки всех экранов.
-- Меню configuration без иерархии (старые SETTINGS).
-- FOCUS_BFO: заливка на idle-слоте +450, transient при повороте.
-- На SSB idle справа на page 6 спокойный BFO; заряд % там не рисуется (VOL сверху).
+Компромиссы
+- Одна secondary-строка (page 6), не две как на макете Sweet Spot.
+- Нет иерархии SETTINGS.
+- Радио и UI в одном ATS_EX.ino.
+- Переключение PS/RT/PTY энкодером убрано, чтобы не воровать focus (MODE = RDS on/off).
 
-Компромиссы относительно Sweet Spot
-- Нет второй полной строки secondary как на макете 128×64 (одна строка page 6: STEP + BFO).
-- Нет pixel-perfect сетки всех экранов.
-- Меню configuration без иерархии (старые SETTINGS).
-- Радио и UI ещё в одном ATS_EX.ino.
+Flash / RAM
+- 31600 / 32256 flash, 1216 SRAM (Uno, FM ST + RDS default).
 
-Flash / RAM (Uno)
-- 31478 / 32256 flash, 1211 SRAM (после idle BFO).
+Дальше
+1. Radio commit-модуль, если влезет во flash.
+2. I2C 400 kHz после замера.
+3. Сверка pixel-grid с макетом и подгонка.
 
-Дальше (порядок)
-1. Профили FM (RDS-строка) vs SSB уже частично: BFO только SSB.
-2. Вынести Radio commit, если flash позволит.
-3. I2C 400 kHz после замера.
-4. Pixel-grid состояний в reports/, затем подгонка экрана.
-
-Как пользоваться на железе
-- Короткий клик энкодера: смена focus.
-- Крутить: частота в NORMAL; STEP/VOL/BW/BFO в focus/transient.
-- STEP/VOL/BW кнопки по-прежнему выбирают функцию.
-- Длинный энкодер: seek только AM/FM.
+Железо
+- Короткий энкодер: focus. Крутить: частота / focused control.
+- Длинный энкодер: seek AM/FM.
+- MODE на FM: RDS-строка.
