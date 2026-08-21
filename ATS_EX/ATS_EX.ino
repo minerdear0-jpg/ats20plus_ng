@@ -196,6 +196,7 @@ void setup()
     applyBandConfiguration();
     g_currentFrequency = g_previousFrequency = g_si4735.getFrequency();
     g_si4735.setVolume(g_volume);
+    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 
     //Draw main screen
     oled.clear();
@@ -854,7 +855,14 @@ void showCharge(bool forceShow)
             buf[2] = '%';
 
         if (!g_settingsActive && !g_sMeterOn && !g_displayRDS)
-            oledPrint(buf, 102, 6, DEFAULT_FONT);
+        {
+            static uint8_t lastPct = 255;
+            if (forceShow || percents != lastPct)
+            {
+                oledPrint(buf, 102, 6, DEFAULT_FONT);
+                lastPct = percents;
+            }
+        }
         lastChargeShow = millis();
         averageSamples = sample;
     }
@@ -1157,7 +1165,7 @@ void loadSSBPatch()
     delay(50);
     g_si4735.downloadCompressedPatch(ssb_patch_content, sizeof(ssb_patch_content), cmd_0x15, sizeof(cmd_0x15));
     g_si4735.setSSBConfig(g_bandwidthSSB[g_bwIndexSSB].idx, 1, 0, 1, 0, 1);
-    g_si4735.setI2CStandardMode();
+    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
     g_ssbLoaded = true;
     g_stepIndex = 0;
 }
@@ -1725,41 +1733,8 @@ void commitRadioFrequency()
 void loop()
 {
     uint8_t x;
-    bool skipButtonEvents = false;
-    bool frequencyRecentlyUpdated = millis() - g_lastFreqChange < FREQ_COMMIT_MS;
 
-    // Encoder always wins: no RDS / S-meter / EEPROM I2C while ticks are pending.
-    if (g_processFreqChange)
-    {
-        if (!frequencyRecentlyUpdated && g_encoderCount == 0)
-            commitRadioFrequency();
-        else if (frequencyRecentlyUpdated && g_encoderCount != 0)
-        {
-            if (isSSB())
-                doFrequencyTuneSSB();
-            else
-                doFrequencyTune();
-            g_encoderCount = 0;
-            return;
-        }
-    }
-
-    if (g_encoderCount == 0 && millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
-    {
-#if USE_RDS
-        showRDS();
-#endif
-
-        if (g_sMeterOn && !g_settingsActive)
-            showSMeter();
-
-        showCharge(false);
-    }
-
-    if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT)
-        switchCommand(NULL, NULL);
-
-    //Encoder rotation check
+    // Input first: encoder never waits on buttons, RDS, or S-meter.
     if (g_encoderCount != 0)
     {
         if (g_lastAdjustmentTime != 0)
@@ -1809,21 +1784,31 @@ void loop()
                 bandSwitch(false);
         }
         else if (isSSB())
-        {
             doFrequencyTuneSSB();
-            skipButtonEvents = true;
-        }
         else
-        {
             doFrequencyTune();
-            skipButtonEvents = true;
-        }
         g_encoderCount = 0;
         resetEepromDelay();
+        goto saveAttempt;
     }
 
-    if (skipButtonEvents)
-        goto saveAttempt;
+    if (g_processFreqChange && (millis() - g_lastFreqChange >= FREQ_COMMIT_MS))
+        commitRadioFrequency();
+
+    if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
+    {
+#if USE_RDS
+        showRDS();
+#endif
+
+        if (g_sMeterOn && !g_settingsActive)
+            showSMeter();
+
+        showCharge(false);
+    }
+
+    if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT)
+        switchCommand(NULL, NULL);
 
     //Command-checkers
     if (BUTTONEVENT_SHORTPRESS == btn_Bandwidth.checkEvent(simpleEvent))

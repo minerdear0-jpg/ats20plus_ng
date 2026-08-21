@@ -47,6 +47,8 @@
 // After the last encoder tick, wait this long before committing SI4735 (OLED already shows requested freq).
 #define FREQ_COMMIT_MS 70
 #define BACKGROUND_UI_MS 1000
+// Runtime I2C after SSB patch download (patch itself stays at 500 kHz).
+#define I2C_RUN_HZ 400000L
 
 // IARU S-meter: Si473x RSSI is dBµV. S9 = 50 µV = 34 dBµV, 6 dB per S-unit.
 #define S9_DBUV 34
