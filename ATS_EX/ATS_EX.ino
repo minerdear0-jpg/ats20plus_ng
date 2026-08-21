@@ -1001,33 +1001,44 @@ void showSMeter()
             sUnit = 9;
     }
 
-    uint8_t blocks = sUnit + (plusDb / 10);
-    if (blocks > SMETER_SEGMENTS)
-        blocks = SMETER_SEGMENTS;
+    // 0..9 = S-units, 10..15 = +10..+60 dB over S9
+    uint8_t val = sUnit;
+    if (plusDb)
+        val = 9 + plusDb / 10;
+    if (val > 15)
+        val = 15;
 
-    oled.setCursor(0, 6);
-    oled.fillLength(0, 128);
-    oledDraw6x8(0, 6, SMETER_GLYPH_S);
-    oledDraw6x8(64, 6, SMETER_GLYPH_DIGIT + 9);
-    oledDraw6x8(112, 6, SMETER_GLYPH_PLUS);
-
-    if (plusDb == 0)
-        oledDraw6x8(76, 6, SMETER_GLYPH_DIGIT + sUnit);
-    else
+    uint8_t digit = 0;
+    if (sUnit)
     {
-        oledDraw6x8(76, 6, SMETER_GLYPH_PLUS);
-        oledDraw6x8(83, 6, SMETER_GLYPH_DIGIT + (plusDb / 10));
-        oledDraw6x8(90, 6, SMETER_GLYPH_DIGIT + (plusDb % 10));
+        digit = 2 + (uint8_t)((sUnit - 1) / 2);
+        if (digit > 6)
+            digit = 6;
     }
 
-    oled.setCursor(0, 7);
+    // Same OLED page: "S9+" then a 2px ramp (wide 8px columns look like a fence).
+    oled.setCursor(0, 6);
     oled.startData();
-    for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
+    oledSendSmGlyph(1);
+    oledSendSmGlyph(digit);
+    oledSendSmGlyph(plusDb ? 7 : 0);
+    oled.sendData(0);
+    oled.sendData(0);
+
+    const uint8_t ramp = 57;
+    uint8_t filled = (uint8_t)((uint16_t)val * ramp / 15);
+    for (uint8_t i = 0; i < ramp; i++)
     {
-        oled.repeatData((i < blocks) ? 0xFF : 0x80, 6);
-        oled.repeatData(0, 2);
+        uint8_t h = 1 + (uint8_t)((uint16_t)i * 7 / (ramp - 1));
+        uint8_t bar = (h >= 8) ? 0xFF : (uint8_t)(~(0xFFu << h));
+        uint8_t pix = (i < filled) ? bar : 0x01;
+        oled.sendData(pix);
+        oled.sendData(pix);
     }
     oled.endData();
+
+    oled.setCursor(0, 7);
+    oled.fillLength(0, 128);
 }
 
 //Draw bandwidth (Ignored for CW mode)
