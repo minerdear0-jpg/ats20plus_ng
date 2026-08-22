@@ -66,6 +66,7 @@ SettingsItem g_Settings[] =
     { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },
     { "Sca", 1,  SettingType::Switch,       doScanSwitch      },
     { "CW ", 0,  SettingType::Switch,       doCWSwitch        },
+    { "ANB", 0,  SettingType::Switch,       doANB             },
 };
 
 int8_t g_SettingSelected = 0;
@@ -123,7 +124,8 @@ int g_tabStep[] =
 uint8_t g_amTotalSteps = 7;
 uint8_t g_amTotalStepsSSB = 4;
 uint8_t g_ssbTotalSteps = 5;
-volatile int8_t g_stepIndex = 3;
+volatile int8_t g_stepIndexAM = 3;
+volatile int8_t g_stepIndexSSB = 7;
 
 int8_t g_tabStepFM[] =
 {

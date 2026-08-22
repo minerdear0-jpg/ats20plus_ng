@@ -114,6 +114,7 @@ void doBFOCalibration(int8_t v);
 void doUnitsSwitch(int8_t v = 0);
 void doScanSwitch(int8_t v = 0);
 void doCWSwitch(int8_t v = 0);
+void doANB(int8_t v = 0);
 
 extern SettingsItem g_Settings[];
 
@@ -137,6 +138,7 @@ enum SettingsIndex
     UnitsSwitch,
     ScanSwitch,
     CWSwitch,
+    ANB,
     SETTINGS_MAX
 };
 
@@ -167,7 +169,8 @@ extern int g_tabStep[];
 extern uint8_t g_amTotalSteps;
 extern uint8_t g_amTotalStepsSSB;
 extern uint8_t g_ssbTotalSteps;
-extern volatile int8_t g_stepIndex;
+extern volatile int8_t g_stepIndexAM;
+extern volatile int8_t g_stepIndexSSB;
 
 extern int8_t g_tabStepFM[];
 extern int8_t g_FMStepIndex;

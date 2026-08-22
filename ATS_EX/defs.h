@@ -48,7 +48,8 @@
 #define FREQ_COMMIT_MS 70
 #define BACKGROUND_UI_MS 1000
 // Runtime I2C after SSB patch download (patch itself stays at 500 kHz).
-// 400000 is the next-gen candidate; leave 100000 until the board confirms 400 kHz is stable.
+// Stay at 100 kHz. 400 kHz SCL is a square wave: harmonics land on MW/SW (HF).
+// diqezit/mod_no_rds even runs ~61.5 kHz so 9 kHz AM / LW stay clearer.
 #define I2C_RUN_HZ 100000L
 
 // IARU S-meter: Si473x RSSI is dBµV. S9 = 50 µV = 34 dBµV, 6 dB per S-unit.

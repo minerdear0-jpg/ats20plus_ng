@@ -1,0 +1,152 @@
+ATS-20 UI — модель состояний
+Ветка ATS-20Plus_next. Спецификация UX / state machine / тест-план.
+Опора: ATS-20_UI_Sweet_Spot.txt (слои), этот файл (переходы и таблица).
+Код пока не обязан совпадать: сначала SQL / автогашение / CW, затем эта машина.
+
+Главное
+
+MAIN никогда не становится меню. Это рабочая панель.
+FOCUS и TRANSIENT — не отдельные страницы, а состояния поверх MAIN.
+Encoder всегда делает самое ожидаемое действие текущего контекста.
+Обычные операции без OK / SAVE. Timeout снимает overlay, не оставляет «залитый STEP».
+
+Не в первом прототипе: spectrum, waterfall, анимации, декоративные рамки, многослойные иконки, постоянный SNR/AGC telemetry, Pong.
+
+------------------------------------------------------------------------
+1. Слои (не страницы)
+
+                         BOOT
+                           ↓
+                         MAIN          ← home, всегда «радио»
+                           │
+              rotate    press     long
+                 ↓        ↓         ↓
+            FREQUENCY  FOCUS      MENU / SEEK (контекст)
+                          │
+                     TRANSIENT     ← overlay на MAIN
+                          │ timeout
+                         MAIN
+
+FOCUS / TRANSIENT живут на MAIN:
+  MAIN
+   ├── focus: none  → encoder = frequency (NORMAL)
+   ├── focus: step
+   ├── focus: volume
+   └── focus: bfo     (только SSB/CW)
+
+  MAIN + TRANSIENT
+   ├── step editor
+   ├── bfo editor
+   ├── volume editor
+   ├── mode selector
+   ├── band selector
+   ├── RDS peek (FM)
+   └── seek
+
+------------------------------------------------------------------------
+2. MAIN (home)
+
+Иерархия взгляда: MODE/STATUS → FREQUENCY → SIGNAL. Secondary спокойно.
+
+SSB (целевой макет, две secondary-строки — сейчас в коде одна):
+  LSB / S9
+  7.123.450
+  S-meter
+  STEP  BW
+  BFO   VOL
+
+FM:
+  FM / STEREO
+  103.700
+  PS (RADIO XYZ) — фон, не режим
+  S-meter  VOL
+  STEP     BW
+
+RDS не ворует encoder. PS обновляется на месте. Доп. RDS — transient по явному действию.
+
+------------------------------------------------------------------------
+3. Encoder: NORMAL vs press
+
+NORMAL: rotate = FREQUENCY. Это базовое поведение, частота не в цикле focus.
+
+Short press encoder:
+  → STEP → VOL → BFO (SSB/CW) → снова NORMAL (частота)
+FM: нет BFO в цикле.
+
+Кнопки (MODE / STEP / BAND / VOL) по-прежнему могут сразу открыть нужный transient — без лабиринта.
+
+Live: значение применяется сразу, пока крутишь.
+
+------------------------------------------------------------------------
+4. TRANSIENT
+
+Верхняя залитая зона, частота остаётся героем внизу (не наоборот).
+Размер окна не обязан быть одинаковым: VOLUME меньше, STEP/BFO/MODE крупнее.
+BFO-шкала −1000…+1000 — только если pixel-прототип не душит 7-seg.
+
+MODE: не пять мелких пунктов. Горизонтально: ◀ LSB ▶
+BAND: ◀ 40 m / 7 MHz ▶ last-used или default частоты сегмента.
+SEEK: только явное действие пользователя, overlay SEEK + частота, стоп крутилкой/кнопкой.
+
+Timeout: TRANSIENT → MAIN (~1200 ms после остановки). Не оставлять FOCUS на экране.
+(Не: TRANSIENT → FOCUS → MAIN.)
+
+------------------------------------------------------------------------
+5. MENU / SETTINGS (после базового радио)
+
+Отделить от operational UI.
+
+long → список: Radio / Display / Audio / RDS / System
+rotate = move, press = enter, long = back
+Редактор пункта — короткий transient, затем снова список. 64 px без гигантских заголовков.
+
+Сейчас в прошивке плоский SETTINGS на кнопке — это не эта иерархия.
+
+------------------------------------------------------------------------
+6. Специальные состояния
+
+LOCK: encoder не крутит частоту; метка LOCK на MAIN. Жест TBD (не обязателен в первом проходе).
+MUTE: без окна; краткий индикатор, затем в status. Не путать с SQL.
+ERROR: одна строка на MAIN (! RADIO / SI4735), Retry, без Win95-диалогов.
+BOOT: короткий splash (сейчас v2.0b OOMAN/Cursor). Без «Initializing I2C…».
+
+------------------------------------------------------------------------
+7. Таблица состояний (основа UX, firmware, тестов)
+
+State            Вход                 Encoder           Short press        Long press     Timeout      Display
+BOOT             power                —                 —                  —              → MAIN       splash
+MAIN             boot / timeout /     Frequency         → FOCUS_STEP       MENU или SEEK  —            home
+                 exit menu            (NORMAL)
+FOCUS_STEP       press из MAIN        → TRANSIENT_STEP  → FOCUS_VOL        MENU           → MAIN       MAIN + invert STEP
+TRANSIENT_STEP   rotate в FOCUS_STEP  Value live        Apply → MAIN       Cancel→MAIN    → MAIN       overlay STEP
+FOCUS_VOL        press из FOCUS_STEP  → TRANSIENT_VOL   → FOCUS_BFO|MAIN   MENU           → MAIN       MAIN + invert VOL
+TRANSIENT_VOL    rotate               Value live        Apply → MAIN       Cancel→MAIN    → MAIN       overlay VOL
+FOCUS_BFO        press, только SSB    → TRANSIENT_BFO   → MAIN (NORMAL)    MENU           → MAIN       MAIN + invert BFO
+TRANSIENT_BFO    rotate               Value live        Apply → MAIN       Cancel→MAIN    → MAIN       overlay BFO
+TRANSIENT_MODE   кнопка MODE          ◀ mode ▶          Apply → MAIN       —              → MAIN       overlay MODE
+TRANSIENT_BAND   кнопка BAND          ◀ band ▶          Apply → MAIN       —              → MAIN       overlay BAND
+TRANSIENT_RDS    явное FM             —                 Close → MAIN       —              → MAIN       overlay PS/RT
+TRANSIENT_SEEK   явное AM/FM          Stop              Stop → MAIN        Stop           —            overlay SEEK
+MENU             long из MAIN         Navigate          Enter              Back→MAIN      —            list
+SETTINGS_EDIT    enter пункта         Value             Apply → MENU       Back→MENU      —            list + editor
+LOCK             жест TBD             ignored (freq)    Unlock TBD         —              —            MAIN + LOCK
+MUTE             VOL mute             как MAIN          unmute             —              —            MAIN + mute mark
+ERROR            I2C/chip fail        —                 Retry              —              —            warning
+
+Apply = сразу (нет OK). Cancel/timeout = значение уже на чипе для STEP/VOL/BFO; просто снять overlay.
+
+------------------------------------------------------------------------
+8. Context-sensitive encoder (сводка)
+
+FM / AM MAIN:  rotate frequency, press STEP-цикл (без BFO на FM)
+SSB MAIN:      rotate frequency, press STEP → VOL → BFO → NORMAL
+TRANSIENT:     rotate value, press закрыть overlay
+MENU:          rotate selection, press enter, long back
+
+------------------------------------------------------------------------
+9. Дельта к текущей прошивке (не ломать, пока не дошли)
+
+Сейчас: клик энкодера Freq → STEP → VOL → BFO; focus может висеть; timeout 1.5 с в idle header; seek = long encoder; SETTINGS плоский; одна secondary-строка.
+Цель: частота только rotate в NORMAL; press не включает «focus frequency»; TRANSIENT → MAIN; иерархия MENU позже; плотность MAIN как макеты выше — когда будет flash и pixel-проход.
+
+SQL / автогашение / CW pitch / CW-декодер не меняют эту машину; гашение экрана — отдельный idle поверх MAIN (экран off, радио играет).

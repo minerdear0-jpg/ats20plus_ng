@@ -13,25 +13,20 @@ void oledClearLine(uint8_t y);
 void setRDSConfig(uint8_t bias);
 #endif
 
-bool isSSB()
-{
-    return g_currentMode > AM && g_currentMode < FM;
-}
-
 int getSteps()
 {
     if (isSSB())
     {
-        if (g_stepIndex >= g_amTotalSteps)
-            return g_tabStep[g_stepIndex];
+        if (g_stepIndexSSB >= g_amTotalSteps)
+            return g_tabStep[g_stepIndexSSB];
 
-        return g_tabStep[g_stepIndex] * 1000;
+        return g_tabStep[g_stepIndexSSB] * 1000;
     }
 
-    if (g_stepIndex >= g_amTotalSteps)
-        g_stepIndex = 0;
+    if (g_stepIndexAM >= g_amTotalSteps)
+        g_stepIndexAM = 0;
 
-    return g_tabStep[g_stepIndex];
+    return g_tabStep[g_stepIndexAM];
 }
 
 void loadSSBPatch()
@@ -46,7 +41,23 @@ void loadSSBPatch()
     g_si4735.setSSBConfig(g_bandwidthSSB[g_bwIndexSSB].idx, 1, 0, 1, 0, 1);
     g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
     g_ssbLoaded = true;
-    g_stepIndex = 0;
+}
+
+void applyAMNoiseBlanker()
+{
+    if (g_currentMode == FM)
+        return;
+
+    if (g_Settings[SettingsIndex::ANB].param)
+    {
+        g_si4735.setProperty(AM_NB_DETECT_THRESHOLD, 12);
+        g_si4735.setProperty(AM_NB_INTERVAL, 55);
+        g_si4735.setProperty(AM_NB_RATE, 64);
+        g_si4735.setProperty(AM_NB_IIR_FILTER, 300);
+        g_si4735.setProperty(AM_NB_DELAY, 172);
+    }
+    else
+        g_si4735.setProperty(AM_NB_DETECT_THRESHOLD, 0);
 }
 
 void applyBandConfiguration(bool extraSSBReset)
@@ -121,6 +132,7 @@ void applyBandConfiguration(bool extraSSBReset)
         g_si4735.setAvcAmMaxGain(g_Settings[SettingsIndex::AutoVolControl].param);
         g_si4735.setSeekAmLimits(minFreq, maxFreq);
         g_si4735.setSeekAmSpacing((g_bandList[g_bandIndex].currentStepIdx >= g_amTotalSteps) ? 1 : g_tabStep[g_bandList[g_bandIndex].currentStepIdx]);
+        applyAMNoiseBlanker();
 #if USE_RDS
         g_displayRDS = false;
 #endif
@@ -130,11 +142,14 @@ void applyBandConfiguration(bool extraSSBReset)
     if (g_currentMode == FM)
         g_FMStepIndex = g_bandList[g_bandIndex].currentStepIdx;
     else
-        g_stepIndex = g_bandList[g_bandIndex].currentStepIdx;
-
-    if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
-        && g_stepIndex > g_amTotalStepsSSB)
-        g_stepIndex = g_amTotalStepsSSB;
+    {
+        g_stepIndexAM = g_bandList[g_bandIndex].currentStepIdx;
+        if (g_stepIndexAM >= g_amTotalSteps)
+            g_stepIndexAM = 0;
+        if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
+            && g_stepIndexAM > g_amTotalStepsSSB)
+            g_stepIndexAM = g_amTotalStepsSSB;
+    }
 
     if (!g_settingsActive)
         showStatus(true);
@@ -198,7 +213,7 @@ void doFrequencyTune()
 #endif
     }
     else
-        g_currentFrequency += g_tabStep[g_stepIndex] * g_encoderCount;
+        g_currentFrequency += g_tabStep[g_stepIndexAM] * g_encoderCount;
     uint16_t bMin = g_bandList[g_bandIndex].minimumFreq, bMax = g_bandList[g_bandIndex].maximumFreq;
 
     //Special logic for fast and responsive frequency surfing

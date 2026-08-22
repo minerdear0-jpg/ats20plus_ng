@@ -1,9 +1,20 @@
 #pragma once
 
 #include <stdint.h>
+#include "globals.h"
 
-bool isSSB();
+inline bool isSSB()
+{
+    return g_currentMode > AM && g_currentMode < FM;
+}
+
+inline volatile int8_t& activeStepIndex()
+{
+    return isSSB() ? g_stepIndexSSB : g_stepIndexAM;
+}
+
 int getSteps();
+void applyAMNoiseBlanker();
 void loadSSBPatch();
 void applyBandConfiguration(bool extraSSBReset = false);
 void updateBFO();

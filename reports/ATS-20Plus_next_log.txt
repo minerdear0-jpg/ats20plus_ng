@@ -2,9 +2,9 @@ ATS-20Plus_next — журнал
 
 Ветка: ATS-20Plus_next (локально, без push).
 Железо цели: Arduino Uno, ATmega328P, 32256 flash / 2048 SRAM.
-I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — ждать подтверждения на плате. Патч SSB по-прежнему 500 kHz.
+I2C в рантайме: 100 kHz (I2C_RUN_HZ). 400 kHz снят: гармоники SCL на КВ/СВ. Патч SSB по-прежнему 500 kHz. Смотреть NACK/STOP как у diqezit (microWire), не разгон шины.
 
-Опора: спецификации в этом каталоге + ATS-20_UI_pixel_grid.txt (факт экрана). UI — Sweet Spot.
+Опора: спецификации в этом каталоге + ATS-20_UI_pixel_grid.txt (факт экрана). UI цель — ATS-20_UI_state_machine.txt (поверх Sweet Spot).
 
 Сделано
 - Encoder burst, ISR короткий, loop: input first.
@@ -19,21 +19,26 @@ I2C в рантайме: 100 kHz (I2C_RUN_HZ). Кандидат 400 kHz — жд
 - SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
 - FM: «ST» при пилоте; RDS-строка включена при входе на FM (MODE её снимает/ставит). Энкодер на FM не переключает ячейки RDS — только focus.
 - Splash v2.0b, (C) OOMAN / Cursor 2026.
+- Шаг AM и SSB раздельный (`g_stepIndexAM` / `g_stepIndexSSB`). EEPROM APP_VERSION 120.
+- ANB: свитч Settings, DSP Si473x (0x3900…04), AM/SSB/CW. Off = порог 0.
 
 Компромиссы
 - Одна secondary-строка (page 6), не две как на макете Sweet Spot.
 - Нет иерархии SETTINGS.
 - Радио: механический split (`radio.cpp` / `radio.h`, те же C-функции, без классов). Состояние в `globals.cpp`.
 - Переключение PS/RT/PTY энкодером убрано, чтобы не воровать focus (MODE = RDS on/off).
+- Pong из форка diqezit не берём.
 
 Flash / RAM
 - До split: 31600 / 32256 flash, 1216 SRAM.
-- После механического split (Uno, I2C 100 kHz, LTO): 31620 / 32256 flash (+20), SRAM 1216 без изменений. Запас ~636 B.
+- После ANB: 31786 / 32256 flash (+120 к шагам), SRAM 1226. Запас ~470 B.
 - nm: isSSB теперь отдельный символ 0x16 (раньше полностью встраивался). doFrequencyTune / commitRadioFrequency / clampSSBBand / getSteps по-прежнему вlined. Живые: updateBFO 0x7A, loadSSBPatch 0x1EC, doFrequencyTuneSSB 0x1F2, applyBandConfiguration 0x598.
 
-Дальше
-1. I2C 400 kHz после замера.
-2. Подгонка плотности secondary под макет, если останется flash.
+Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
+Полный RDS не копируем (потом RDS MINI ~500 B, если надо место). Вендорный SI4735 — отдельно, не скопом.
+По одной фиче + avr-size: SQL; автогашение экрана; CW pitch; опциональный CW-декодер (флаг, по умолчанию выкл.).
+Затем UI state machine (частота только rotate; press = STEP→VOL→BFO→NORMAL; TRANSIENT→MAIN).
+Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
 
 Оценка Radio-модуля
 Механический split сделан. Класс Radio / tuning.step() по-прежнему не писать: типично +200…600 B.

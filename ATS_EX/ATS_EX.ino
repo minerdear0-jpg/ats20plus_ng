@@ -34,6 +34,9 @@ int getLastStep()
     if (isSSB())
         return g_amTotalSteps + g_ssbTotalSteps - 1;
 
+    if (g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
+        return g_amTotalStepsSSB - 1;
+
     return g_amTotalSteps - 1;
 }
 
@@ -41,7 +44,7 @@ int getLastStep()
 // ------- Main logic -------
 // --------------------------
 
-#define APP_VERSION 118
+#define APP_VERSION 120
 
 //Initialize controller
 // Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
@@ -321,6 +324,7 @@ void saveAllReceiverInformation()
     EEPROM.update(addr++, g_FMStepIndex);
     EEPROM.update(addr++, g_prevMode); 
     EEPROM.update(addr++, g_bwIndexSSB);
+    EEPROM.update(addr++, g_stepIndexSSB);
 
     for (uint8_t i = 0; i <= g_lastBand; i++)
     {
@@ -346,6 +350,11 @@ void readAllReceiverInformation()
     g_FMStepIndex = EEPROM.read(addr++);
     g_prevMode = EEPROM.read(addr++);
     g_bwIndexSSB = EEPROM.read(addr++);
+    g_stepIndexSSB = EEPROM.read(addr++);
+    if (g_stepIndexSSB < 0
+        || g_stepIndexSSB > (int8_t)(g_amTotalSteps + g_ssbTotalSteps - 1)
+        || (g_stepIndexSSB >= g_amTotalStepsSSB && g_stepIndexSSB < g_amTotalSteps))
+        g_stepIndexSSB = 7;
 
     for (uint8_t i = 0; i <= g_lastBand; i++)
     {
@@ -363,10 +372,12 @@ void readAllReceiverInformation()
     if (g_bandIndex == FM_BAND_TYPE)
         g_FMStepIndex = g_bandList[g_bandIndex].currentStepIdx;
     else
-        g_stepIndex = g_bandList[g_bandIndex].currentStepIdx;
+    {
+        g_stepIndexAM = g_bandList[g_bandIndex].currentStepIdx;
+        if (g_stepIndexAM >= g_amTotalSteps)
+            g_stepIndexAM = 0;
+    }
     bwIdx = g_bandList[g_bandIndex].bandwidthIdx;
-    if (g_stepIndex >= g_amTotalSteps)
-        g_stepIndex = 0;
 
     if (isSSB())
     {
@@ -1003,7 +1014,7 @@ void showStep()
     }
     else
     {
-        if (g_tabStep[g_stepIndex] == 1000)
+        if (g_tabStep[activeStepIndex()] == 1000)
         {
             buf[0] = ' ';
             buf[1] = ' ';
@@ -1011,11 +1022,11 @@ void showStep()
             buf[3] = 'M';
             buf[4] = 0x0;
         }
-        else if (isSSB() && g_stepIndex >= g_amTotalSteps)
-            convertToChar(buf, g_tabStep[g_stepIndex], 4);
+        else if (isSSB() && g_stepIndexSSB >= g_amTotalSteps)
+            convertToChar(buf, g_tabStep[g_stepIndexSSB], 4);
         else
         {
-            convertToChar(buf, g_tabStep[g_stepIndex], 3);
+            convertToChar(buf, g_tabStep[activeStepIndex()], 3);
             buf[3] = 'k';
             buf[4] = '\0';
         }
@@ -1281,7 +1292,7 @@ void bandSwitch(bool up)
         if (g_currentMode == FM)
             g_bandList[g_bandIndex].currentStepIdx = g_FMStepIndex;
         else
-            g_bandList[g_bandIndex].currentStepIdx = g_stepIndex;
+            g_bandList[g_bandIndex].currentStepIdx = g_stepIndexAM;
 
         if (up)
         {
@@ -1344,32 +1355,23 @@ void doStep(int8_t v)
     }
     else
     {
-        g_stepIndex = (v > 0) ? g_stepIndex + 1 : g_stepIndex - 1;
-        if (g_stepIndex > getLastStep())
-            g_stepIndex = 0;
-        else if (g_stepIndex < 0)
-            g_stepIndex = getLastStep();
-
-        //SSB Step limit
-        else if (isSSB() && g_stepIndex >= g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
-            g_stepIndex = v > 0 ? g_amTotalSteps : g_amTotalStepsSSB - 1;
-        
-        //LW/MW Step limit
-        else if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
-            && v > 0 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
-            g_stepIndex = g_amTotalSteps;
-        else if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
-            && v < 0 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
-            g_stepIndex = g_amTotalStepsSSB;
-
-        if (!isSSB() || isSSB() && g_stepIndex < g_amTotalSteps)
-        {
-            g_si4735.setFrequencyStep(g_tabStep[g_stepIndex]);
-            g_bandList[g_bandIndex].currentStepIdx = g_stepIndex;
-        }
+        volatile int8_t& st = activeStepIndex();
+        st = (v > 0) ? st + 1 : st - 1;
+        if (st > getLastStep())
+            st = 0;
+        else if (st < 0)
+            st = getLastStep();
+        else if (isSSB() && st >= g_amTotalStepsSSB && st < g_amTotalSteps)
+            st = v > 0 ? g_amTotalSteps : g_amTotalStepsSSB - 1;
 
         if (!isSSB())
-            g_si4735.setSeekAmSpacing((g_bandList[g_bandIndex].currentStepIdx >= g_amTotalSteps) ? 1 : g_tabStep[g_bandList[g_bandIndex].currentStepIdx]);
+        {
+            g_si4735.setFrequencyStep(g_tabStep[st]);
+            g_bandList[g_bandIndex].currentStepIdx = st;
+            g_si4735.setSeekAmSpacing((st >= g_amTotalSteps) ? 1 : g_tabStep[st]);
+        }
+        else if (st < g_amTotalSteps)
+            g_si4735.setFrequencyStep(g_tabStep[st]);
         showStep();
     }
 }
@@ -1552,6 +1554,12 @@ void doCWSwitch(int8_t v = 0)
 
     if (g_currentMode == CW)
         applyBandConfiguration(true);
+}
+
+void doANB(int8_t v)
+{
+    doSwitchLogic(g_Settings[SettingsIndex::ANB].param, 0, 1, v);
+    applyAMNoiseBlanker();
 }
 
 #if USE_RDS
@@ -1905,14 +1913,12 @@ void loop()
                 case CW:
                     g_currentMode = AM;
                     g_ssbLoaded = false;
-                    if (g_stepIndex >= g_amTotalSteps)
-                        g_stepIndex = 0;
 
                     g_currentFrequency += (g_currentBFO / 1000);
                     break;
                 }
 
-                g_bandList[g_bandIndex].currentStepIdx = g_stepIndex;
+                g_bandList[g_bandIndex].currentStepIdx = g_stepIndexAM;
                 applyBandConfiguration();
             }
 #if USE_RDS
