@@ -17,6 +17,7 @@ S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; 
 - RDS / S-метр / заряд не ходят по I2C, пока крутится encoder.
 - Dirty mark/flush для частоты.
 - Слои NORMAL / FOCUS / TRANSIENT. Press: STEP → VOL → BFO → MAIN (частота только rotate). TRANSIENT press и timeout 1.2 с → MAIN.
+- MENU: RADIO / DISP / AUDIO / SYS. BandDn вход/выход. Press = войти / править. Long энкодера и BandUp = назад. AM/FM long = seek; SSB/CW long = MENU.
 - Seek AM/FM: длинное нажатие энкодера.
 - S-метр всегда под частотой (page 5); 7-seg pages 2–4. Порядок MODE → FREQ → SIGNAL.
 - SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
@@ -26,30 +27,30 @@ S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; 
 - ANB: свитч Settings, DSP Si473x (0x3900…04), AM/SSB/CW. Off = порог 0.
 - SQL: AM RSSI-порог 0…60, `setAudioMute` по фронту. Не спорит с VOL mute. Не опрашивает шину на крутилке.
 - Автогашение OLED: Settings `DIS` Off / 15s / 30s / 60s / 2m. Первый жест только будит экран. AGC по-прежнему ручной on/off. SQL при погашенном экране продолжает опрос.
-- CW pitch: Settings `CWP` 500/600/700/800 Hz (по умолчанию 700). Смещение BFO только в CW, циферблат без pitch. `CW` по-прежнему LSB/USB. Settings page 4: SQL.
+- CW pitch: Settings `CWP` 500/600/700/800 Hz (по умолчанию 700). Смещение BFO только в CW, циферблат без pitch. `CW` по-прежнему LSB/USB.
 
 Компромиссы
 - Одна secondary-строка (page 6), не две как на макете Sweet Spot.
-- Нет иерархии SETTINGS.
+- Нет иерархии SETTINGS: есть MENU RADIO/DISP/AUDIO/SYS. RDS-категории нет (`USE_RDS 0`).
 - Радио: механический split (`radio.cpp` / `radio.h`, те же C-функции, без классов). Состояние в `globals.cpp`.
 - Переключение PS/RT/PTY энкодером убрано вместе с полным RDS.
 - Pong из форка diqezit не берём.
 
 Flash / RAM
 - До split: 31600 / 32256 flash, 1216 SRAM.
-- После UI encoder map: 31504 / 32256 flash, SRAM 1227. Запас ~752 B.
+- После MENU: 31678 / 32256 flash (+174), SRAM 1272. Запас ~578 B.
 - nm: isSSB теперь отдельный символ 0x16 (раньше полностью встраивался). doFrequencyTune / commitRadioFrequency / clampSSBBand / getSteps по-прежнему вlined. Живые: updateBFO 0x7A, loadSSBPatch 0x1EC, doFrequencyTuneSSB 0x1F2, applyBandConfiguration 0x598.
 
 Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
 Полный RDS выключен. RDS MINI — если снова понадобится строка PS (~500 B).
-Затем иерархия MENU (не в этом проходе). Acceleration 10/100/1k — если SSB всё ещё ступеньками.
+Acceleration 10/100/1k — если SSB всё ещё ступеньками.
 Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
 
 Оценка Radio-модуля
 Механический split сделан. Класс Radio / tuning.step() по-прежнему не писать: типично +200…600 B.
 
 Железо
-- Короткий энкодер: STEP→VOL→BFO→MAIN. Крутить в MAIN: частота. В TRANSIENT: значение, press снимает overlay.
-- Длинный энкодер: seek AM/FM.
+- Короткий энкодер: STEP→VOL→BFO→MAIN. В MENU: rotate список, press войти/править.
+- Длинный энкодер: seek AM/FM; SSB/CW и внутри MENU — назад / открыть MENU.
 - MODE на FM: ничего (RDS снят). ST по пилоту.
 - AGC короткий: OLED on/off вручную, если экран уже включён. После автогашения любой жест только будит.

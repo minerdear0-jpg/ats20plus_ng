@@ -747,64 +747,102 @@ void SettingParamToUI(char* buf, uint8_t idx)
     }
 }
 
-// If full false - update only value
-void DrawSetting(uint8_t idx, bool full)
+enum { MENU_CATS = 4, MENU_ROWS = 3 };
+
+static const uint8_t kMenuRadio[] = {
+    SettingsIndex::ATT, SettingsIndex::Sync, SettingsIndex::AutoVolControl,
+    SettingsIndex::CutoffFilter, SettingsIndex::ANB, SettingsIndex::SQL, SettingsIndex::BFO
+};
+static const uint8_t kMenuDisp[] = {
+    SettingsIndex::Brightness, SettingsIndex::DisplayOff, SettingsIndex::SWUnits, SettingsIndex::UnitsSwitch
+};
+static const uint8_t kMenuAudio[] = {
+    SettingsIndex::SoftMute, SettingsIndex::DeEmp, SettingsIndex::SVC, SettingsIndex::SSM
+};
+static const uint8_t kMenuSys[] = {
+    SettingsIndex::CPUSpeed, SettingsIndex::ScanSwitch, SettingsIndex::CWSwitch, SettingsIndex::CWPitch
+};
+static const uint8_t* const kMenuItems[] = { kMenuRadio, kMenuDisp, kMenuAudio, kMenuSys };
+static const uint8_t kMenuCount[] = { 7, 4, 4, 4 };
+static const char* const kMenuNames[] = { "RADIO", "DISP", "AUDIO", "SYS" };
+
+static uint8_t menuItemAt(uint8_t sel)
+{
+    return kMenuItems[g_menuCat][sel];
+}
+
+static uint8_t menuScrollTop()
+{
+    uint8_t n = kMenuCount[g_menuCat];
+    uint8_t sel = (uint8_t)g_SettingSelected;
+    if (n <= MENU_ROWS || sel < MENU_ROWS)
+        return 0;
+    uint8_t s = sel - (MENU_ROWS - 1);
+    if (s + MENU_ROWS > n)
+        s = n - MENU_ROWS;
+    return s;
+}
+
+void DrawSetting(uint8_t idx, uint8_t row, bool full)
 {
     if (!g_settingsActive)
         return;
 
     char buf[5];
-    uint8_t place = idx - ((g_SettingsPage - 1) * 6);
-    uint8_t yOffset = place > 2 ? (place - 3) * 2 : place * 2;
-    uint8_t xOffset = place > 2 ? 60 : 0;
+    uint8_t y = 2 + row * 2;
     if (full)
-        oledPrint(g_Settings[idx].name, 5 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && !g_SettingEditing);
+        oledPrint(g_Settings[idx].name, 0, y, DEFAULT_FONT, idx == menuItemAt((uint8_t)g_SettingSelected) && !g_SettingEditing);
     SettingParamToUI(buf, idx);
-    oledPrint(buf, 35 + xOffset, 2 + yOffset, DEFAULT_FONT, idx == g_SettingSelected && g_SettingEditing);
+    oledPrint(buf, 72, y, DEFAULT_FONT, idx == menuItemAt((uint8_t)g_SettingSelected) && g_SettingEditing);
 }
 
-//Update and draw settings UI
-void showSettings()
+void showMenu()
 {
-    for (uint8_t i = 0; i < 6 && i + ((g_SettingsPage - 1) * 6) < SettingsIndex::SETTINGS_MAX; i++)
-        DrawSetting(i + ((g_SettingsPage - 1) * 6), true);
-}
-
-void showSettingsTitle()
-{
-    oledPrint("   SETTINGS  ", 0, 0, DEFAULT_FONT, true);
-    oled.invertOutput(true);
-    char pg[4];
-    pg[0] = '0' + g_SettingsPage;
-    pg[1] = '/';
-    pg[2] = '0' + g_SettingsMaxPages;
-    pg[3] = 0;
-    oled.print(pg);
-    oled.invertOutput(false);
-}
-
-void switchSettingsPage()
-{
-    g_SettingsPage++;
-    g_SettingsPage = (g_SettingsPage > g_SettingsMaxPages) ? 1 : g_SettingsPage;
-    g_SettingSelected = 6 * (g_SettingsPage - 1);
-    g_SettingEditing = false;
     oled.clear();
-    showSettingsTitle();
-    showSettings();
+    if (g_menuLevel == 1)
+    {
+        for (uint8_t i = 0; i < MENU_CATS; i++)
+            oledPrint(kMenuNames[i], 0, i * 2, DEFAULT_FONT, i == (uint8_t)g_SettingSelected);
+        return;
+    }
+
+    oledPrint(kMenuNames[g_menuCat], 0, 0, DEFAULT_FONT, true);
+    uint8_t n = kMenuCount[g_menuCat];
+    uint8_t top = menuScrollTop();
+    for (uint8_t r = 0; r < MENU_ROWS && (top + r) < n; r++)
+        DrawSetting(menuItemAt(top + r), r, true);
 }
 
-//Switch between main screen and settings mode
+void menuBack()
+{
+    if (g_SettingEditing)
+    {
+        g_SettingEditing = false;
+        showMenu();
+        return;
+    }
+    if (g_menuLevel == 2)
+    {
+        g_menuLevel = 1;
+        g_SettingSelected = g_menuCat;
+        showMenu();
+        return;
+    }
+    g_settingsActive = false;
+    saveAllReceiverInformation();
+    showStatus();
+}
+
 void switchSettings()
 {
     oled.clear();
     if (g_settingsActive)
     {
-        g_SettingsPage = 1;
-        showSettingsTitle();
+        g_menuLevel = 1;
+        g_menuCat = 0;
         g_SettingSelected = 0;
         g_SettingEditing = false;
-        showSettings();
+        showMenu();
     }
     else
     {
@@ -1801,32 +1839,32 @@ void loop()
 
         if (g_settingsActive)
         {
-            if (!g_SettingEditing)
+            if (g_menuLevel == 1)
             {
-                int8_t prev = g_SettingSelected;
-                int8_t next = g_SettingSelected;
-
-                next += g_encoderCount;
-
-                uint8_t pageIdx = g_SettingsPage - 1;
-                uint8_t maxOnThisPage = (pageIdx * 6) + 5;
-                if (maxOnThisPage >= SettingsIndex::SETTINGS_MAX)
-                    maxOnThisPage = SettingsIndex::SETTINGS_MAX - 1;
-
-                if (next < pageIdx * 6)
-                    g_SettingSelected = maxOnThisPage;
-                else if (next > maxOnThisPage)
-                    g_SettingSelected = pageIdx * 6;
-                else
-                    g_SettingSelected = next;
-
-                DrawSetting(prev, true);
-                DrawSetting(g_SettingSelected, true);
+                int8_t next = g_SettingSelected + g_encoderCount;
+                while (next < 0)
+                    next += MENU_CATS;
+                while (next >= MENU_CATS)
+                    next -= MENU_CATS;
+                g_SettingSelected = next;
+                showMenu();
+            }
+            else if (!g_SettingEditing)
+            {
+                int8_t n = (int8_t)kMenuCount[g_menuCat];
+                int8_t next = g_SettingSelected + g_encoderCount;
+                while (next < 0)
+                    next += n;
+                while (next >= n)
+                    next -= n;
+                g_SettingSelected = next;
+                showMenu();
             }
             else
             {
-                (*g_Settings[g_SettingSelected].manipulateCallback)(g_encoderCount);
-                DrawSetting(g_SettingSelected, false);
+                uint8_t idx = menuItemAt((uint8_t)g_SettingSelected);
+                (*g_Settings[idx].manipulateCallback)(g_encoderCount);
+                DrawSetting(idx, (uint8_t)g_SettingSelected - menuScrollTop(), false);
             }
         }
         else if (g_cmdVolume)
@@ -1919,7 +1957,7 @@ void loop()
         }
         else
         {
-            switchSettingsPage();
+            menuBack();
         }
     }
     if (BUTTONEVENT_SHORTPRESS == btn_BandDn.checkEvent(bandEvent))
@@ -1958,8 +1996,19 @@ void loop()
     {
         if (g_settingsActive)
         {
-            g_SettingEditing = !g_SettingEditing;
-            DrawSetting(g_SettingSelected, true);
+            if (g_menuLevel == 1)
+            {
+                g_menuCat = (uint8_t)g_SettingSelected;
+                g_menuLevel = 2;
+                g_SettingSelected = 0;
+                g_SettingEditing = false;
+                showMenu();
+            }
+            else
+            {
+                g_SettingEditing = !g_SettingEditing;
+                showMenu();
+            }
         }
         else if (g_uiLayer == UI_LAYER_TRANSIENT)
             switchCommand(NULL, NULL);
@@ -1968,8 +2017,16 @@ void loop()
     }
     else if (BUTTONEVENT_LONGPRESSDONE == encEvent)
     {
-        if (!g_settingsActive && (g_currentMode == FM || g_currentMode == AM))
+        if (g_settingsActive)
+            menuBack();
+        else if (g_currentMode == FM || g_currentMode == AM)
             doSeek();
+        else
+        {
+            switchCommand(NULL, NULL);
+            g_settingsActive = true;
+            switchSettings();
+        }
     }
 
     //This is a hack, it allows SHORTPRESS and LONGPRESS events

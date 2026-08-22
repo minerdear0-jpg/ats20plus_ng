@@ -150,9 +150,9 @@ enum SettingsIndex
     SETTINGS_MAX
 };
 
-const uint8_t g_SettingsMaxPages = 4;
 extern int8_t g_SettingSelected;
-extern int8_t g_SettingsPage;
+extern uint8_t g_menuLevel;
+extern uint8_t g_menuCat;
 extern bool g_SettingEditing;
 
 //For managing BW

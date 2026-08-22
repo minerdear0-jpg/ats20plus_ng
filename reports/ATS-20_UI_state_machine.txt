@@ -1,7 +1,7 @@
 ATS-20 UI — модель состояний
 Ветка ATS-20Plus_next. Спецификация UX / state machine / тест-план.
 Опора: ATS-20_UI_Sweet_Spot.txt (слои), этот файл (переходы и таблица).
-Код пока не обязан совпадать по MENU/иерархии. Encoder map MAIN: rotate частота, press STEP-цикл — в прошивке.
+Код: encoder map MAIN и иерархия MENU (4 категории, без RDS). ◀ MODE ▶ и две secondary — позже.
 
 Главное
 
@@ -100,7 +100,7 @@ long → список: Radio / Display / Audio / RDS / System
 rotate = move, press = enter, long = back
 Редактор пункта — короткий transient, затем снова список. 64 px без гигантских заголовков.
 
-Сейчас в прошивке плоский SETTINGS на кнопке — это не эта иерархия.
+Сейчас в прошивке: BandDn открывает MENU; 4 категории (без RDS). Long = назад. Редактор пункта — press, live apply, press снова список. Иерархия как в §5, не плоские страницы 1/4.
 
 ------------------------------------------------------------------------
 6. Специальные состояния
@@ -146,7 +146,7 @@ MENU:          rotate selection, press enter, long back
 ------------------------------------------------------------------------
 9. Дельта к текущей прошивке
 
-Сделано: частота только rotate в NORMAL; press = STEP→VOL→BFO→MAIN (без «focus frequency»);
-TRANSIENT press и timeout (~1200 ms) → MAIN, overlay не зависает.
-Иерархия MENU / ◀ MODE ▶ / две secondary-строки — позже, pixel-проход.
-SQL / автогашение / CW pitch не меняют эту машину.
+Сделано: частота только rotate в NORMAL; press = STEP→VOL→BFO→MAIN;
+TRANSIENT press и timeout (~1200 ms) → MAIN.
+MENU: RADIO / DISP / AUDIO / SYS; редактор пункта → снова список.
+◀ MODE ▶ / две secondary-строки — позже, pixel-проход.

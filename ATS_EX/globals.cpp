@@ -47,14 +47,12 @@ uint16_t g_previousFrequency;
 
 SettingsItem g_Settings[] =
 {
-    //Page 1
     { "ATT", 0,  SettingType::ZeroAuto,     doAttenuation     },
     { "SM ", 0,  SettingType::Num,          doSoftMute        },
     { "SVC", 1,  SettingType::Switch,       doSSBAVC          },
     { "Syn", 0,  SettingType::Switch,       doSync            },
     { "DeE", 1,  SettingType::Switch,       doDeEmp           },
     { "AVC", 46, SettingType::Num,          doAvc             },
-    //Page 2
     { "Scr", 80, SettingType::Num,          doBrightness      },
     { "SW ", 0,  SettingType::Switch,       doSWUnits         },
     { "SSM", 1,  SettingType::Switch,       doSSBSoftMuteMode },
@@ -64,7 +62,6 @@ SettingsItem g_Settings[] =
     { "RDS", 1,  SettingType::Num,          doRDSErrorLevel   },
 #endif
     { "DIS", 0,  SettingType::Num,          doDisplayOff      },
-    //Page 3
     { "BFO", 0,  SettingType::Num,          doBFOCalibration  },
     { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },
     { "Sca", 1,  SettingType::Switch,       doScanSwitch      },
@@ -75,7 +72,8 @@ SettingsItem g_Settings[] =
 };
 
 int8_t g_SettingSelected = 0;
-int8_t g_SettingsPage = 1;
+uint8_t g_menuLevel = 1;
+uint8_t g_menuCat = 0;
 bool g_SettingEditing = false;
 
 int8_t g_bwIndexSSB = 4;
