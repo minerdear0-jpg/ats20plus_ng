@@ -274,8 +274,7 @@ void doFrequencyTune()
         g_currentFrequency = bMax;
 
     g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
-    g_processFreqChange = true;
-    g_lastFreqChange = millis();
+    markFreqPending();
 
     uiMark(UI_FREQ);
 }
@@ -305,15 +304,33 @@ void doFrequencyTuneSSB()
         g_ssbNeedHwFreq = true;
 
     g_bandList[g_bandIndex].currentFreq = g_currentFrequency + (g_currentBFO / 1000);
-    g_processFreqChange = true;
-    g_lastFreqChange = millis();
+    markFreqPending();
     g_previousFrequency = 0; //Force EEPROM update
     if (!clampSSBBand())
         uiMark(UI_FREQ);
 }
 
+void markFreqPending()
+{
+    if (!g_processFreqChange)
+        g_rfPendingSince = millis();
+    g_processFreqChange = true;
+    g_lastFreqChange = millis();
+}
+
+void servicePendingTune()
+{
+    if (!g_processFreqChange)
+        return;
+    uint32_t t0 = isSSB() ? g_rfPendingSince : g_lastFreqChange;
+    uint16_t wait = isSSB() ? (uint16_t)RF_COMMIT_MS : (uint16_t)FREQ_COMMIT_MS;
+    if ((millis() - t0) >= wait)
+        commitRadioFrequency();
+}
+
 void commitRadioFrequency()
 {
+    g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
     if (isSSB())
     {
         if (g_ssbNeedHwFreq)
@@ -328,5 +345,6 @@ void commitRadioFrequency()
     }
     else
         g_si4735.setFrequency(g_currentFrequency);
+    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
     g_processFreqChange = false;
 }

@@ -12,12 +12,11 @@ S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; 
 
 Сделано
 - Encoder burst, ISR короткий, loop: input first.
-- Deferred SI4735 (70 ms), в том числе SSB BFO / kHz wrap.
+- Deferred SI4735: AM/FM debounce 70 ms; SSB/CW deadline 10 ms (`g_rfPendingSince`), commit и пока крутят. 400 kHz только на пакет commit.
 - Нет delay() на крутилке и в seek-колбэке.
 - RDS / S-метр / заряд не ходят по I2C, пока крутится encoder.
 - Dirty mark/flush для частоты.
-- Слои NORMAL / FOCUS / TRANSIENT; клик энкодера: Freq → STEP → VOL → BFO (SSB).
-- Transient: залитая верхняя полоса; timeout 1.5 с.
+- Слои NORMAL / FOCUS / TRANSIENT. Press: STEP → VOL → BFO → MAIN (частота только rotate). TRANSIENT press и timeout 1.2 с → MAIN.
 - Seek AM/FM: длинное нажатие энкодера.
 - S-метр всегда под частотой (page 5); 7-seg pages 2–4. Порядок MODE → FREQ → SIGNAL.
 - SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
@@ -38,20 +37,19 @@ S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; 
 
 Flash / RAM
 - До split: 31600 / 32256 flash, 1216 SRAM.
-- После CWP: 31406 / 32256 flash (+94), SRAM 1227. Запас ~850 B.
+- После UI encoder map: 31504 / 32256 flash, SRAM 1227. Запас ~752 B.
 - nm: isSSB теперь отдельный символ 0x16 (раньше полностью встраивался). doFrequencyTune / commitRadioFrequency / clampSSBBand / getSteps по-прежнему вlined. Живые: updateBFO 0x7A, loadSSBPatch 0x1EC, doFrequencyTuneSSB 0x1F2, applyBandConfiguration 0x598.
 
 Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
 Полный RDS выключен. RDS MINI — если снова понадобится строка PS (~500 B).
-По одной фиче + avr-size: CW-декодер не берём (десятки КБ). SSB I2C deadline ~10 ms + burst 400 на commit; acceleration 10/100/1k — после, avr-size.
-Затем UI state machine (частота только rotate; press = STEP→VOL→BFO→NORMAL; TRANSIENT→MAIN).
+Затем иерархия MENU (не в этом проходе). Acceleration 10/100/1k — если SSB всё ещё ступеньками.
 Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
 
 Оценка Radio-модуля
 Механический split сделан. Класс Radio / tuning.step() по-прежнему не писать: типично +200…600 B.
 
 Железо
-- Короткий энкодер: focus. Крутить: частота / focused control.
+- Короткий энкодер: STEP→VOL→BFO→MAIN. Крутить в MAIN: частота. В TRANSIENT: значение, press снимает overlay.
 - Длинный энкодер: seek AM/FM.
 - MODE на FM: ничего (RDS снят). ST по пилоту.
 - AGC короткий: OLED on/off вручную, если экран уже включён. После автогашения любой жест только будит.

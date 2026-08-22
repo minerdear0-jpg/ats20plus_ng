@@ -50,10 +50,8 @@ TRANSIENT / commitRadioFrequency, не на showSMeter / RDS.
 После отпускания энкодера: settle → commit → QUIET.
 Не держать 400 кГц десятки ms «на всякий случай».
 
-SSB отдельно: ATS-20_SSB_I2C_burst.txt.
-Сейчас `FREQ_COMMIT_MS` 70 — debounce (таймер сбрасывается на тик): быстрый спин
-откладывает RF. Для SSB нужен deadline ~10 ms и latest desired, не «ещё 70 ms тишины».
-UI уже может быть быстрее RF; 400 кГц — только длина транзакции commit.
+SSB: `RF_COMMIT_MS` 10 с первого pending; AM/FM debounce 70. 400 кГц только в `commitRadioFrequency`, сразу 100.
+Acceleration 10/100/1k ещё нет.
 
 Профили (позже, не RSSI-автомат вслепую):
   RF_QUIET     100k, реже OLED, агрессивный sleep

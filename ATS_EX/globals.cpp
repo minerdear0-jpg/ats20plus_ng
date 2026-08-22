@@ -202,6 +202,7 @@ volatile uint8_t g_prevMode = FM;
 uint8_t g_seekDirection = 1;
 
 uint32_t g_lastFreqChange = 0;
+uint32_t g_rfPendingSince = 0;
 bool g_processFreqChange = 0;
 bool g_ssbNeedHwFreq = false;
 uint8_t g_volume = DEFAULT_VOLUME;

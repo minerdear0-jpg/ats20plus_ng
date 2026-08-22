@@ -1256,6 +1256,7 @@ void cycleEncoderFocus()
     if (next == FOCUS_FREQ)
     {
         g_lastAdjustmentTime = 0;
+        showBfoIdle();
         return;
     }
 
@@ -1703,16 +1704,18 @@ void switchCommand(bool* b, void (*showFunction)())
 
     if (!b)
     {
-        if (prev)
-        {
-            *prev = false;
-            if (prevFunc)
-                prevFunc();
-            g_lastAdjustmentTime = 0;
-            restoreIdleHeader();
-            g_uiFocus = FOCUS_FREQ;
-            prev = NULL;
-        }
+        g_cmdVolume = false;
+        g_cmdStep = false;
+        g_cmdBw = false;
+        g_cmdBand = false;
+        g_lastAdjustmentTime = 0;
+        g_uiFocus = FOCUS_FREQ;
+        restoreIdleHeader();
+        showStep();
+        showVolume();
+        showBfoIdle();
+        prev = NULL;
+        prevFunc = NULL;
         return;
     }
 
@@ -1883,9 +1886,7 @@ void loop()
         goto saveAttempt;
     }
 
-    if (g_processFreqChange && (millis() - g_lastFreqChange >= FREQ_COMMIT_MS))
-        commitRadioFrequency();
-
+    servicePendingTune();
     uiFlush();
 
     if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
@@ -1960,6 +1961,8 @@ void loop()
             g_SettingEditing = !g_SettingEditing;
             DrawSetting(g_SettingSelected, true);
         }
+        else if (g_uiLayer == UI_LAYER_TRANSIENT)
+            switchCommand(NULL, NULL);
         else
             cycleEncoderFocus();
     }
@@ -2058,6 +2061,7 @@ void loop()
     }
 
 saveAttempt:
+    servicePendingTune();
     displaySleepIfDue();
     //Save EEPROM if anough time passed and frequency changed
     if (g_currentFrequency != g_previousFrequency)

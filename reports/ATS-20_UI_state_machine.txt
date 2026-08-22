@@ -1,7 +1,7 @@
 ATS-20 UI — модель состояний
 Ветка ATS-20Plus_next. Спецификация UX / state machine / тест-план.
 Опора: ATS-20_UI_Sweet_Spot.txt (слои), этот файл (переходы и таблица).
-Код пока не обязан совпадать: сначала SQL / автогашение / CW, затем эта машина.
+Код пока не обязан совпадать по MENU/иерархии. Encoder map MAIN: rotate частота, press STEP-цикл — в прошивке.
 
 Главное
 
@@ -144,9 +144,9 @@ TRANSIENT:     rotate value, press закрыть overlay
 MENU:          rotate selection, press enter, long back
 
 ------------------------------------------------------------------------
-9. Дельта к текущей прошивке (не ломать, пока не дошли)
+9. Дельта к текущей прошивке
 
-Сейчас: клик энкодера Freq → STEP → VOL → BFO; focus может висеть; timeout 1.5 с в idle header; seek = long encoder; SETTINGS плоский; одна secondary-строка.
-Цель: частота только rotate в NORMAL; press не включает «focus frequency»; TRANSIENT → MAIN; иерархия MENU позже; плотность MAIN как макеты выше — когда будет flash и pixel-проход.
-
-SQL / автогашение / CW pitch / CW-декодер не меняют эту машину; гашение экрана — отдельный idle поверх MAIN (экран off, радио играет).
+Сделано: частота только rotate в NORMAL; press = STEP→VOL→BFO→MAIN (без «focus frequency»);
+TRANSIENT press и timeout (~1200 ms) → MAIN, overlay не зависает.
+Иерархия MENU / ◀ MODE ▶ / две secondary-строки — позже, pixel-проход.
+SQL / автогашение / CW pitch не меняют эту машину.

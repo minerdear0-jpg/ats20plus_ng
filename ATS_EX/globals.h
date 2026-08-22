@@ -40,7 +40,7 @@ extern uint8_t g_uiFocus;
 
 enum UiFocus : uint8_t
 {
-    FOCUS_FREQ = 0,
+    FOCUS_FREQ = 0, // MAIN: rotate = frequency, not a press-cycle item
     FOCUS_STEP,
     FOCUS_VOL,
     FOCUS_BFO
@@ -239,6 +239,7 @@ extern uint8_t g_seekDirection;
 
 //Special logic for fast and responsive frequency surfing
 extern uint32_t g_lastFreqChange;
+extern uint32_t g_rfPendingSince;
 extern bool g_processFreqChange;
 extern bool g_ssbNeedHwFreq;
 extern uint8_t g_volume;

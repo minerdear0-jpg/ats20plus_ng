@@ -1,8 +1,7 @@
 ATS-20 SSB — I2C burst и coalescing с deadline
 Потенциальный выход, не текущий код. Ветка ATS-20Plus_next.
 Опора: ATS-20_I2C_burst.txt (шум / 100 vs 400), этот файл (ощущение SSB tuning).
-Сейчас в прошивке: desired частота уже в MCU (`g_currentFrequency` / `g_currentBFO`), OLED сразу,
-Si473x через `FREQ_COMMIT_MS` 70. Шины 100 kHz. Постоянные 400 kHz не включать.
+Сейчас в прошивке: desired в MCU, OLED сразу. SSB/CW: `RF_COMMIT_MS` 10 (окно с первого pending, не сброс на тик), commit и на крутилке (`saveAttempt`). AM/FM: debounce `FREQ_COMMIT_MS` 70. `commitRadioFrequency` — 400 kHz, сразу 100. Патч SSB 500 kHz. Acceleration ещё нет.
 
 Главное
 
@@ -158,20 +157,14 @@ Acceleration — UI/radio слой (`getSteps()` / burst `g_encoderCount`), не
 
 Есть:
   encoder first, OLED dirty, desired в RAM, фон I2C не на крутилке,
-  SSB BFO + wrap kHz, патч 500 kHz уже burst.
+  SSB BFO + wrap kHz, патч 500 kHz уже burst;
+  SSB deadline 10 ms + 400 kHz только вокруг commit.
 
 Нет:
-  400 kHz только на commit;
-  deadline ~10 ms вместо reset-on-tick 70 ms (хотя бы в SSB);
-  явный IDLE / TUNING / SETTLE для clock;
+  явный IDLE / TUNING / SETTLE как отдельный state (clock уже Fast→Quiet на пакете);
   velocity acceleration 10 / 100 / 1000.
 
-Порядок, когда дойдём (после CW pitch по журналу, или раньше если SSB «тупой»):
-  1. SSB: commit по max(10 ms с первого pending, не сброс на каждый тик)
-     или periodic 10 ms пока `g_processFreqChange`.
-  2. `i2cFast` только вокруг этого commit, сразу Quiet.
-  3. Проверка слухом: слабый SSB на КВ, ДВ 9 кГц на idle vs spin.
-  4. Acceleration — если остался flash и 10 ms всё ещё «ступеньки» на медленном шаге.
+Дальше: слух на КВ/ДВ. Acceleration — если ступеньки на мелком шаге и есть flash.
 
 Не делать: постоянные 400; Settings «I2C 400»; RF=UI tick-for-tick;
 RAII-класс ради скобок; coalesce без потолка latency.

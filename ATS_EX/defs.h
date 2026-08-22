@@ -44,12 +44,15 @@
 // Default values
 #define MIN_ELAPSED_TIME 100
 #define MIN_ELAPSED_RSSI_TIME 150
-// After the last encoder tick, wait this long before committing SI4735 (OLED already shows requested freq).
+// After the last encoder tick, wait this long before committing SI4735 (AM/FM debounce).
 #define FREQ_COMMIT_MS 70
+// SSB/CW: max RF lag vs desired. Timer starts on first pending tick, not reset per detent.
+#define RF_COMMIT_MS 10
 #define BACKGROUND_UI_MS 1000
 // Runtime I2C after SSB patch download (patch itself stays at 500 kHz).
-// Default 100 kHz while listening. Do not leave 400 kHz on; see reports/ATS-20_I2C_burst.txt.
+// Default 100 kHz while listening. 400 kHz only around commit; see reports/ATS-20_SSB_I2C_burst.txt.
 #define I2C_RUN_HZ 100000L
+#define I2C_FAST_HZ 400000L
 
 // Auto OLED off: 0 = never, 1..4 = 15s, 30s, 60s, 120s
 #define DISPLAY_OFF_MAX 4
@@ -59,7 +62,7 @@
 #define SMETER_MAX_OVER_S9 60
 #define SMETER_SEGMENTS 16
 #define DEFAULT_VOLUME 25
-#define ADJUSTMENT_ACTIVE_TIMEOUT 1500
+#define ADJUSTMENT_ACTIVE_TIMEOUT 1200
 
 // Sweet Spot pages: header/transient 0-1, 7-seg 2-4, S-meter 5, secondary 6-7.
 #define UI_PAGE_FREQ 2

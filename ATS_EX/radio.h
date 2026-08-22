@@ -23,4 +23,6 @@ void updateBFO();
 bool clampSSBBand();
 void doFrequencyTune();
 void doFrequencyTuneSSB();
+void markFreqPending();
+void servicePendingTune();
 void commitRadioFrequency();
