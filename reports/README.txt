@@ -9,6 +9,8 @@ reports/
 - ATS-20_I2C_burst.txt — 400 кГц только коротким burst; Fast when touching, quiet when listening
 - ATS-20_SSB_I2C_burst.txt — SSB: UI rate ≠ RF rate, coalescing с deadline ~10 ms, не debounce 70 ms
 - ATS-20_S-meter_dirty.txt — S-meter: регион page 5, три частоты, не full redraw; quiet window vs RF
+- ATS-20_I2C_nack_stop.txt — изолированный NACK→STOP; четыре замера; glitch = откат
+- ATS-20_reverse_port_ats-mini.txt — полировка: v1.18 эталон, diqezit основа, Mini только идеи → 328P
 
 Журнал ветки
 - ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы

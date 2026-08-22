@@ -1,0 +1,74 @@
+ATS-20 I2C — NACK → STOP (изолированное исследование)
+Первый кандидат полировки. Не перенос SI4735-стека Mini / diqezit.
+Ветка ATS-20Plus_next. Опора: ATS-20_I2C_burst.txt, ATS-20_reverse_port_ats-mini.txt.
+
+Цель
+
+  current I2C transaction
+          ↓
+       NACK?
+          ↓
+     STOP immediately
+          ↓
+     bus released
+          ↓
+     no unnecessary recovery traffic
+
+Не «красивее ли код». Четыре измерения, все обязательны:
+
+  1. Время неуспешной транзакции (µs / ms до свободной шины).
+  2. Состояние SDA/SCL после NACK (оба high? SCL зажат? повторный START?).
+  3. Следующая успешная команда SI473x (setFrequency / GET_INT_STATUS / CTS).
+  4. Слышимый результат при tuning и при polling (SQL / S-meter).
+
+П.4 — вето: если NACK/STOP сокращает зависание шины, но даёт редкий audio glitch
+(щелчок, mute, срыв SSB), изменение проиграло. Откат.
+
+------------------------------------------------------------------------
+Что есть сейчас (PU2CLR + AVR Wire)
+
+waitToSend() в SI4735.cpp:
+
+  do {
+      delayMicroseconds(MIN_DELAY_WAIT_SEND_LOOP);
+      Wire.requestFrom(deviceAddress, 1);
+  } while (!(Wire.read() & 0x80));
+
+Бесконечный poll CTS. Нет потолка, нет разбора кода endTransmission().
+Большинство sendCommand: endTransmission() без проверки error.
+
+AVR Wire.endTransmission() при NACK адреса/данных обычно уже шлёт STOP
+(код 2/3). Риск не в «забыли STOP в успешном пути», а в:
+
+  requestFrom без CTS / slave busy → повторные START;
+  waitToSend крутится, пока крутилка и OLED ждут;
+  после сбоя — лишний recovery (reset I2C, повтор пакета, delay).
+
+Изолированный патч: не форк библиотеки. Обёртка/лимит вокруг waitToSend
+и проверка endTransmission() только на путях commit / status.
+Не microWire целиком, не SI4735-fixed.h из Mini.
+
+------------------------------------------------------------------------
+Как исследовать (железо, один патч за раз)
+
+A. База: Uno HEAD, I2C 100 kHz idle, 400 только commit. Логировать
+   (если есть анализатор) или millis вокруг waitToSend / endTransmission.
+B. Спровоцировать NACK без ломания приёма: короткий reset Si473x / слишком
+   ранний GET_INT_STATUS после setFrequency; не отключать подтяжки насовсем
+   на рабочей плате, если можно снять на копии.
+C. Замер 1–3: длительность, линии после STOP, первая успешная команда.
+D. Замер 4: SSB крутилка (deadline 10 ms), AM SQL poll, idle S-meter.
+   Сравнить с HEAD: щелчок в динамике = fail.
+E. avr-size до/после. Если flash вырос, а NACK на штатном прогоне не бывает —
+   не мержить.
+
+Успех: шина отпускается по NACK без лишних байт; следующая команда проходит;
+слух не хуже HEAD на tuning и на poll.
+
+------------------------------------------------------------------------
+Не делать в этом исследовании
+
+Порт SI4735.cpp из Mini.
+Замена Wire на microWire скопом.
+Глобальный 400 кГц «чтобы NACK быстрее».
+currentCmd, Draw-сплит, acceleration — другие кандидаты.

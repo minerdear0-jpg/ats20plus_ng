@@ -44,6 +44,10 @@ Flash / RAM
 Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
 Полный RDS выключен. RDS MINI — если снова понадобится строка PS (~500 B).
 Acceleration 10/100/1k — если SSB всё ещё ступеньками.
+Полировка: ATS-20_reverse_port_ats-mini.txt.
+1. NACK/STOP изолированно (ATS-20_I2C_nack_stop.txt), не стек Mini; glitch = откат.
+2. currentCmd — только с avr-size до/после.
+MAIN|MENU уже граница operational/config. Draw≠Si473x как функции, не классы.
 Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
 
 Оценка Radio-модуля
