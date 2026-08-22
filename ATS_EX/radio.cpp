@@ -60,8 +60,49 @@ void applyAMNoiseBlanker()
         g_si4735.setProperty(AM_NB_DETECT_THRESHOLD, 0);
 }
 
+void handleSquelch(uint8_t rssi)
+{
+    if (g_muteVolume)
+        return;
+
+    bool cut = g_Settings[SettingsIndex::SQL].param
+        && g_currentMode == AM
+        && rssi < (uint8_t)g_Settings[SettingsIndex::SQL].param;
+
+    if (cut != g_squelchCutoff)
+    {
+        g_si4735.setAudioMute(cut);
+        g_squelchCutoff = cut;
+    }
+}
+
+void applySquelchNow()
+{
+    if (g_muteVolume)
+        return;
+
+    if (g_currentMode != AM || g_Settings[SettingsIndex::SQL].param == 0)
+    {
+        if (g_squelchCutoff)
+        {
+            g_si4735.setAudioMute(false);
+            g_squelchCutoff = false;
+        }
+        return;
+    }
+
+    g_si4735.getCurrentReceivedSignalQuality();
+    handleSquelch(g_si4735.getCurrentRSSI());
+}
+
 void applyBandConfiguration(bool extraSSBReset)
 {
+    if (g_squelchCutoff)
+    {
+        g_si4735.setAudioMute(false);
+        g_squelchCutoff = false;
+    }
+
     g_si4735.setTuneFrequencyAntennaCapacitor(uint16_t(g_bandIndex == SW_BAND_TYPE));
     if (g_bandIndex == FM_BAND_TYPE)
     {

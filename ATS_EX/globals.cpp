@@ -24,8 +24,10 @@ bool g_displayRDS = false;
 bool g_rdsSwitchPressed = false;
 bool g_seekStop = false;
 uint32_t g_lastAdjustmentTime = 0;
+uint32_t g_lastInputMs = 0;
 
 uint8_t g_muteVolume = 0;
+bool g_squelchCutoff = false;
 int g_currentBFO = 0;
 
 SimpleButton  btn_Bandwidth(BANDWIDTH_BUTTON);
@@ -61,12 +63,14 @@ SettingsItem g_Settings[] =
 #if USE_RDS
     { "RDS", 1,  SettingType::Num,          doRDSErrorLevel   },
 #endif
+    { "DIS", 0,  SettingType::Num,          doDisplayOff      },
     //Page 3
     { "BFO", 0,  SettingType::Num,          doBFOCalibration  },
     { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },
     { "Sca", 1,  SettingType::Switch,       doScanSwitch      },
     { "CW ", 0,  SettingType::Switch,       doCWSwitch        },
     { "ANB", 0,  SettingType::Switch,       doANB             },
+    { "SQL", 0,  SettingType::Num,          doSQL             },
 };
 
 int8_t g_SettingSelected = 0;

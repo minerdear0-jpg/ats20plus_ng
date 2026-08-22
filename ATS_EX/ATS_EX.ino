@@ -44,7 +44,7 @@ int getLastStep()
 // ------- Main logic -------
 // --------------------------
 
-#define APP_VERSION 120
+#define APP_VERSION 122
 
 //Initialize controller
 // Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
@@ -186,10 +186,13 @@ void setup()
     //Draw main screen
     oled.clear();
     showStatus();
+    g_lastInputMs = millis();
 }
 
 uint8_t volumeEvent(uint8_t event, uint8_t pin)
 {
+    if (event)
+        g_lastInputMs = millis();
     if (g_muteVolume)
     {
         if (!BUTTONEVENT_ISDONE(event))
@@ -230,6 +233,8 @@ uint8_t volumeEvent(uint8_t event, uint8_t pin)
 
 uint8_t simpleEvent(uint8_t event, uint8_t pin)
 {
+    if (event)
+        g_lastInputMs = millis();
     if (BUTTONEVENT_FIRSTLONGPRESS == event)
         event = BUTTONEVENT_SHORTPRESS;
     return event;
@@ -249,6 +254,8 @@ uint8_t agcEvent(uint8_t event, uint8_t pin)
 
 uint8_t bandEvent(uint8_t event, uint8_t pin)
 {
+    if (event)
+        g_lastInputMs = millis();
 #if (0 != BAND_DELAY)
     static uint8_t count;
     if (BUTTONEVENT_ISLONGPRESS(event) && !g_settingsActive)
@@ -586,6 +593,41 @@ void SettingParamToUI(char* buf, uint8_t idx)
         break;
 
     case SettingType::Num:
+        if (idx == SettingsIndex::DisplayOff)
+        {
+            if (param <= 0)
+            {
+                buf[0] = 'O';
+                buf[1] = 'f';
+                buf[2] = 'f';
+            }
+            else if (param == 1)
+            {
+                buf[0] = '1';
+                buf[1] = '5';
+                buf[2] = 's';
+            }
+            else if (param == 2)
+            {
+                buf[0] = '3';
+                buf[1] = '0';
+                buf[2] = 's';
+            }
+            else if (param == 3)
+            {
+                buf[0] = '6';
+                buf[1] = '0';
+                buf[2] = 's';
+            }
+            else
+            {
+                buf[0] = '2';
+                buf[1] = 'm';
+                buf[2] = ' ';
+            }
+            buf[3] = 0;
+            break;
+        }
         convertToChar(buf, abs(param), 3);
         if (param < 0)
             buf[0] = '-';
@@ -1054,6 +1096,7 @@ void showSMeter()
 
     g_si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = g_si4735.getCurrentRSSI();
+    handleSquelch(rssi);
     uint8_t sUnit;
     uint8_t plusDb = 0;
     if (rssi >= S9_DBUV)
@@ -1383,6 +1426,7 @@ void doVolume(int8_t v)
     {
         g_si4735.setVolume(g_muteVolume);
         g_muteVolume = 0;
+        applySquelchNow();
     }
     else
     {
@@ -1521,6 +1565,17 @@ void doCPUSpeed(int8_t v = 0)
     interrupts();
 }
 
+void doDisplayOff(int8_t v)
+{
+    doSwitchLogic(g_Settings[SettingsIndex::DisplayOff].param, 0, DISPLAY_OFF_MAX, v);
+    if (g_Settings[SettingsIndex::DisplayOff].param == 0 && !g_displayOn)
+    {
+        g_displayOn = true;
+        oled.on();
+    }
+    g_lastInputMs = millis();
+}
+
 //Settings: BFO Offset calibration
 void doBFOCalibration(int8_t v)
 {
@@ -1560,6 +1615,12 @@ void doANB(int8_t v)
 {
     doSwitchLogic(g_Settings[SettingsIndex::ANB].param, 0, 1, v);
     applyAMNoiseBlanker();
+}
+
+void doSQL(int8_t v)
+{
+    doSwitchLogic(g_Settings[SettingsIndex::SQL].param, 0, 60, v);
+    applySquelchNow();
 }
 
 #if USE_RDS
@@ -1678,13 +1739,45 @@ void resetLowerLine()
     }
 }
 
+static const uint8_t kDispOffSec[] = { 0, 15, 30, 60, 120 };
+
+void displayWake()
+{
+    if (!g_displayOn)
+    {
+        g_displayOn = true;
+        oled.on();
+    }
+    g_lastInputMs = millis();
+}
+
+void displaySleepIfDue()
+{
+    uint8_t p = (uint8_t)g_Settings[SettingsIndex::DisplayOff].param;
+    if (p == 0 || p > DISPLAY_OFF_MAX || !g_displayOn || g_settingsActive)
+        return;
+    if ((millis() - g_lastInputMs) < (uint32_t)kDispOffSec[p] * 1000UL)
+        return;
+    g_displayOn = false;
+    oled.off();
+}
+
 void loop()
 {
     uint8_t x;
+    const bool screenWasOff = !g_displayOn;
 
     // Input first: encoder never waits on buttons, RDS, or S-meter.
     if (g_encoderCount != 0)
     {
+        if (screenWasOff)
+        {
+            displayWake();
+            g_encoderCount = 0;
+            goto saveAttempt;
+        }
+        g_lastInputMs = millis();
+
         if (g_lastAdjustmentTime != 0)
             g_lastAdjustmentTime = millis();
 
@@ -1756,6 +1849,25 @@ void loop()
         goto saveAttempt;
     }
 
+    if (screenWasOff)
+    {
+        uint8_t poke = 0;
+        poke |= btn_Bandwidth.checkEvent(simpleEvent);
+        poke |= btn_BandUp.checkEvent(simpleEvent);
+        poke |= btn_BandDn.checkEvent(simpleEvent);
+        poke |= btn_VolumeUp.checkEvent(simpleEvent);
+        poke |= btn_VolumeDn.checkEvent(simpleEvent);
+        poke |= btn_Encoder.checkEvent(simpleEvent);
+        poke |= btn_AGC.checkEvent(simpleEvent);
+        poke |= btn_Step.checkEvent(simpleEvent);
+        poke |= btn_Mode.checkEvent(simpleEvent);
+        if (poke)
+            displayWake();
+        else if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
+            applySquelchNow();
+        goto saveAttempt;
+    }
+
     if (g_processFreqChange && (millis() - g_lastFreqChange >= FREQ_COMMIT_MS))
         commitRadioFrequency();
 
@@ -1820,6 +1932,7 @@ void loop()
             {
                 g_si4735.setVolume(g_muteVolume);
                 g_muteVolume = 0;
+                applySquelchNow();
             }
             showVolume();
         }
@@ -1848,13 +1961,14 @@ void loop()
     uint8_t agcEvent = btn_AGC.checkEvent(agcEvent);
     if (BUTTONEVENT_SHORTPRESS == agcEvent)
     {
-        if (!g_settingsActive || g_settingsActive && !g_displayOn)
+        if (!g_settingsActive || (g_settingsActive && !g_displayOn))
         {
             g_displayOn = !g_displayOn;
             if (g_displayOn)
                 oled.on();
             else
                 oled.off();
+            g_lastInputMs = millis();
         }
     }
     if (BUTTONEVENT_LONGPRESS == agcEvent)
@@ -1929,6 +2043,7 @@ void loop()
     }
 
 saveAttempt:
+    displaySleepIfDue();
     //Save EEPROM if anough time passed and frequency changed
     if (g_currentFrequency != g_previousFrequency)
     {

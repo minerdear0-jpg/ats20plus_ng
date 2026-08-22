@@ -6,6 +6,7 @@ reports/
 - ATS-20_next_generation_architecture_report.txt — Radio Core / UI Core, deferred tune, dirty OLED
 - ATS-20_UI_Sweet_Spot.txt — UI: NORMAL / FOCUS / TRANSIENT, frequency hero, design rules v0.1
 - ATS-20_UI_state_machine.txt — слои поверх MAIN, таблица состояний, encoder map (цель после базовых фич)
+- ATS-20_I2C_burst.txt — 400 кГц только коротким burst; Fast when touching, quiet when listening
 
 Журнал ветки
 - ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы

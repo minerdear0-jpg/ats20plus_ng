@@ -15,6 +15,8 @@ inline volatile int8_t& activeStepIndex()
 
 int getSteps();
 void applyAMNoiseBlanker();
+void handleSquelch(uint8_t rssi);
+void applySquelchNow();
 void loadSSBPatch();
 void applyBandConfiguration(bool extraSSBReset = false);
 void updateBFO();

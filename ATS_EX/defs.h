@@ -2,7 +2,7 @@
 
 //If you set this def to 0 project will be compiled without RDS 
 //and everything related to RDS will be excluded from build
-#define USE_RDS 1
+#define USE_RDS 0
 
 #define EEPROM_APP_ID				235
 #define EEPROM_DATA_START_ADDRESS	1
@@ -48,9 +48,11 @@
 #define FREQ_COMMIT_MS 70
 #define BACKGROUND_UI_MS 1000
 // Runtime I2C after SSB patch download (patch itself stays at 500 kHz).
-// Stay at 100 kHz. 400 kHz SCL is a square wave: harmonics land on MW/SW (HF).
-// diqezit/mod_no_rds even runs ~61.5 kHz so 9 kHz AM / LW stay clearer.
+// Default 100 kHz while listening. Do not leave 400 kHz on; see reports/ATS-20_I2C_burst.txt.
 #define I2C_RUN_HZ 100000L
+
+// Auto OLED off: 0 = never, 1..4 = 15s, 30s, 60s, 120s
+#define DISPLAY_OFF_MAX 4
 
 // IARU S-meter: Si473x RSSI is dBµV. S9 = 50 µV = 34 dBµV, 6 dB per S-unit.
 #define S9_DBUV 34

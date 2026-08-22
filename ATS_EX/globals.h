@@ -59,8 +59,10 @@ extern bool g_displayRDS;
 extern bool g_rdsSwitchPressed;
 extern bool g_seekStop;
 extern uint32_t g_lastAdjustmentTime;
+extern uint32_t g_lastInputMs;
 
 extern uint8_t g_muteVolume;
+extern bool g_squelchCutoff;
 extern int g_currentBFO;
 
 // Encoder buttons
@@ -110,11 +112,13 @@ void doCPUSpeed(int8_t v = 0);
 #if USE_RDS
 void doRDSErrorLevel(int8_t v);
 #endif
+void doDisplayOff(int8_t v);
 void doBFOCalibration(int8_t v);
 void doUnitsSwitch(int8_t v = 0);
 void doScanSwitch(int8_t v = 0);
 void doCWSwitch(int8_t v = 0);
 void doANB(int8_t v = 0);
+void doSQL(int8_t v);
 
 extern SettingsItem g_Settings[];
 
@@ -134,11 +138,13 @@ enum SettingsIndex
 #if USE_RDS
     RDSError,
 #endif
+    DisplayOff,
     BFO,
     UnitsSwitch,
     ScanSwitch,
     CWSwitch,
     ANB,
+    SQL,
     SETTINGS_MAX
 };
 
