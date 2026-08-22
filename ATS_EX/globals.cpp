@@ -69,6 +69,7 @@ SettingsItem g_Settings[] =
     { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },
     { "Sca", 1,  SettingType::Switch,       doScanSwitch      },
     { "CW ", 0,  SettingType::Switch,       doCWSwitch        },
+    { "CWP", 7,  SettingType::Num,          doCWPitch         },
     { "ANB", 0,  SettingType::Switch,       doANB             },
     { "SQL", 0,  SettingType::Num,          doSQL             },
 };

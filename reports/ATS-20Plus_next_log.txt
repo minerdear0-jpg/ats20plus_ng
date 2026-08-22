@@ -23,10 +23,11 @@ S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; 
 - SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
 - FM: «ST» при пилоте. Полный RDS выключен (`USE_RDS 0`) — flash. MODE на FM больше не переключает RDS.
 - Splash v2.0b, (C) OOMAN / Cursor 2026.
-- Шаг AM и SSB раздельный (`g_stepIndexAM` / `g_stepIndexSSB`). EEPROM APP_VERSION 122.
+- Шаг AM и SSB раздельный (`g_stepIndexAM` / `g_stepIndexSSB`). EEPROM APP_VERSION 123.
 - ANB: свитч Settings, DSP Si473x (0x3900…04), AM/SSB/CW. Off = порог 0.
 - SQL: AM RSSI-порог 0…60, `setAudioMute` по фронту. Не спорит с VOL mute. Не опрашивает шину на крутилке.
 - Автогашение OLED: Settings `DIS` Off / 15s / 30s / 60s / 2m. Первый жест только будит экран. AGC по-прежнему ручной on/off. SQL при погашенном экране продолжает опрос.
+- CW pitch: Settings `CWP` 500/600/700/800 Hz (по умолчанию 700). Смещение BFO только в CW, циферблат без pitch. `CW` по-прежнему LSB/USB. Settings page 4: SQL.
 
 Компромиссы
 - Одна secondary-строка (page 6), не две как на макете Sweet Spot.
@@ -37,13 +38,12 @@ S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; 
 
 Flash / RAM
 - До split: 31600 / 32256 flash, 1216 SRAM.
-- После SQL+RDS+DIS: 31312 / 32256 flash, SRAM 1219. Запас ~944 B (RDS снял больше, чем съели SQL и таймер).
+- После CWP: 31406 / 32256 flash (+94), SRAM 1227. Запас ~850 B.
 - nm: isSSB теперь отдельный символ 0x16 (раньше полностью встраивался). doFrequencyTune / commitRadioFrequency / clampSSBBand / getSteps по-прежнему вlined. Живые: updateBFO 0x7A, loadSSBPatch 0x1EC, doFrequencyTuneSSB 0x1F2, applyBandConfiguration 0x598.
 
 Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
 Полный RDS выключен. RDS MINI — если снова понадобится строка PS (~500 B).
-По одной фиче + avr-size: CW pitch; опциональный CW-декодер (флаг, по умолчанию выкл.).
-SSB I2C: deadline ~10 ms + burst 400 на commit; acceleration 10/100/1k — после, avr-size.
+По одной фиче + avr-size: CW-декодер не берём (десятки КБ). SSB I2C deadline ~10 ms + burst 400 на commit; acceleration 10/100/1k — после, avr-size.
 Затем UI state machine (частота только rotate; press = STEP→VOL→BFO→NORMAL; TRANSIENT→MAIN).
 Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
 

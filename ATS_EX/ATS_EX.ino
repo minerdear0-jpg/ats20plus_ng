@@ -44,7 +44,7 @@ int getLastStep()
 // ------- Main logic -------
 // --------------------------
 
-#define APP_VERSION 122
+#define APP_VERSION 123
 
 //Initialize controller
 // Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
@@ -625,6 +625,14 @@ void SettingParamToUI(char* buf, uint8_t idx)
                 buf[1] = 'm';
                 buf[2] = ' ';
             }
+            buf[3] = 0;
+            break;
+        }
+        if (idx == SettingsIndex::CWPitch)
+        {
+            buf[0] = '0' + param;
+            buf[1] = '0';
+            buf[2] = '0';
             buf[3] = 0;
             break;
         }
@@ -1609,6 +1617,13 @@ void doCWSwitch(int8_t v = 0)
 
     if (g_currentMode == CW)
         applyBandConfiguration(true);
+}
+
+void doCWPitch(int8_t v)
+{
+    doSwitchLogic(g_Settings[SettingsIndex::CWPitch].param, 5, 8, v);
+    if (g_currentMode == CW)
+        updateBFO();
 }
 
 void doANB(int8_t v)

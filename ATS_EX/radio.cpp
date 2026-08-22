@@ -199,8 +199,18 @@ void applyBandConfiguration(bool extraSSBReset)
 
 void updateBFO()
 {
+    int16_t bfo = g_currentBFO + (g_Settings[SettingsIndex::BFO].param * 10);
+    if (g_currentMode == CW)
+    {
+        int16_t pitch = (int16_t)g_Settings[SettingsIndex::CWPitch].param * 100;
+        // CWSwitch 0 = LSB, 1 = USB. Pitch is audio offset, not the dial.
+        if (g_Settings[SettingsIndex::CWSwitch].param)
+            bfo -= pitch;
+        else
+            bfo += pitch;
+    }
     //Actually to move frequency forward you need to move BFO backwards, so just * -1
-    g_si4735.setSSBBfo((g_currentBFO + (g_Settings[SettingsIndex::BFO].param * 10)) * -1);
+    g_si4735.setSSBBfo(bfo * -1);
 }
 
 bool clampSSBBand()

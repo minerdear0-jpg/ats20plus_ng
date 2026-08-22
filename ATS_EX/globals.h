@@ -117,6 +117,7 @@ void doBFOCalibration(int8_t v);
 void doUnitsSwitch(int8_t v = 0);
 void doScanSwitch(int8_t v = 0);
 void doCWSwitch(int8_t v = 0);
+void doCWPitch(int8_t v);
 void doANB(int8_t v = 0);
 void doSQL(int8_t v);
 
@@ -143,12 +144,13 @@ enum SettingsIndex
     UnitsSwitch,
     ScanSwitch,
     CWSwitch,
+    CWPitch,
     ANB,
     SQL,
     SETTINGS_MAX
 };
 
-const uint8_t g_SettingsMaxPages = 3;
+const uint8_t g_SettingsMaxPages = 4;
 extern int8_t g_SettingSelected;
 extern int8_t g_SettingsPage;
 extern bool g_SettingEditing;
