@@ -7,6 +7,8 @@ reports/
 - ATS-20_UI_Sweet_Spot.txt — UI: NORMAL / FOCUS / TRANSIENT, frequency hero, design rules v0.1
 - ATS-20_UI_state_machine.txt — слои поверх MAIN, таблица состояний, encoder map (цель после базовых фич)
 - ATS-20_I2C_burst.txt — 400 кГц только коротким burst; Fast when touching, quiet when listening
+- ATS-20_SSB_I2C_burst.txt — SSB: UI rate ≠ RF rate, coalescing с deadline ~10 ms, не debounce 70 ms
+- ATS-20_S-meter_dirty.txt — S-meter: регион page 5, три частоты, не full redraw; quiet window vs RF
 
 Журнал ветки
 - ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы

@@ -4,6 +4,8 @@ ATS-20Plus_next — журнал
 Железо цели: Arduino Uno, ATmega328P, 32256 flash / 2048 SRAM.
 I2C в рантайме: 100 kHz (I2C_RUN_HZ). Постоянные 400 kHz сняты (гармоники на КВ/СВ).
 Потенциал: ATS-20_I2C_burst.txt — 400 kHz только на интерактивном пакете, фон 100 kHz.
+SSB: ATS-20_SSB_I2C_burst.txt — UI≠RF, coalescing с deadline ~10 ms (не debounce 70).
+S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; OLED ≠ каждый RSSI.
 Патч SSB по-прежнему 500 kHz (уже burst). NACK/STOP как у diqezit — отдельно.
 
 Опора: спецификации в этом каталоге + ATS-20_UI_pixel_grid.txt (факт экрана). UI цель — ATS-20_UI_state_machine.txt (поверх Sweet Spot).
@@ -41,6 +43,7 @@ Flash / RAM
 Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
 Полный RDS выключен. RDS MINI — если снова понадобится строка PS (~500 B).
 По одной фиче + avr-size: CW pitch; опциональный CW-декодер (флаг, по умолчанию выкл.).
+SSB I2C: deadline ~10 ms + burst 400 на commit; acceleration 10/100/1k — после, avr-size.
 Затем UI state machine (частота только rotate; press = STEP→VOL→BFO→NORMAL; TRANSIENT→MAIN).
 Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
 

@@ -34,8 +34,9 @@ SSB patch              уже 500 kHz, затем restore I2C_RUN_HZ — пре�
 Не Wire.setClock(400000) глобально.
 
 Интерактив (частота, BW, BFO, mode, AGC/ATT, volume, band): burst 400.
-Фон (RSSI, SQL, RDS, status poll): 100.
+Фон (RSSI, SQL, S-meter, status poll): 100.
 Особо «видимые» на спектре последовательности: 100 или отложить.
+Экран как часть RF: ATS-20_S-meter_dirty.txt (quiet window, не full redraw).
 
 Batch: SET FREQ + status в одном окне fast, не чередовать wait/I2C/wait.
 
@@ -46,8 +47,13 @@ Batch: SET FREQ + status в одном окне fast, не чередовать 
 фон не ходит по шине пока крутится крутилка. Burst 400 ложится на
 TRANSIENT / commitRadioFrequency, не на showSMeter / RDS.
 
-После отпускания энкодера: settle → commit (уже 70 ms) → QUIET.
+После отпускания энкодера: settle → commit → QUIET.
 Не держать 400 кГц десятки ms «на всякий случай».
+
+SSB отдельно: ATS-20_SSB_I2C_burst.txt.
+Сейчас `FREQ_COMMIT_MS` 70 — debounce (таймер сбрасывается на тик): быстрый спин
+откладывает RF. Для SSB нужен deadline ~10 ms и latest desired, не «ещё 70 ms тишины».
+UI уже может быть быстрее RF; 400 кГц — только длина транзакции commit.
 
 Профили (позже, не RSSI-автомат вслепую):
   RF_QUIET     100k, реже OLED, агрессивный sleep
