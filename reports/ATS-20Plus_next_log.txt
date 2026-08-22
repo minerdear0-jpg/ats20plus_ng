@@ -1,60 +1,47 @@
 ATS-20Plus_next — журнал
 
 Ветка: ATS-20Plus_next (локально, без push).
+Baseline прошивки: 4fe59be (build.sh). Дальше: один эксперимент = один commit = один avr-size = один hardware test.
 Железо цели: Arduino Uno, ATmega328P, 32256 flash / 2048 SRAM.
-I2C в рантайме: 100 kHz (I2C_RUN_HZ). Постоянные 400 kHz сняты (гармоники на КВ/СВ).
-Потенциал: ATS-20_I2C_burst.txt — 400 kHz только на интерактивном пакете, фон 100 kHz.
-SSB: ATS-20_SSB_I2C_burst.txt — UI≠RF, coalescing с deadline ~10 ms (не debounce 70).
-S-meter: ATS-20_S-meter_dirty.txt — dirty page 5, не полный кадр; OLED ≠ каждый RSSI.
-Патч SSB по-прежнему 500 kHz (уже burst). NACK/STOP как у diqezit — отдельно.
 
-Опора: спецификации в этом каталоге + ATS-20_UI_pixel_grid.txt (факт экрана). UI цель — ATS-20_UI_state_machine.txt (поверх Sweet Spot).
+I2C (уже архитектура, не план): 100 kHz NORMAL/QUIET; 400 kHz только пакет commitRadioFrequency; патч SSB 500 kHz. История глобальных 400: 965c5d3, снято.
+SSB: deadline 10 ms (`g_rfPendingSince`), не debounce. Фон (S-meter/SQL/RDS/battery) не на крутилке.
+S-meter: frozen unless hardware test shows perceptual/RF problem.
+Опора: спецификации в этом каталоге. UI: ATS-20_UI_state_machine.txt поверх Sweet Spot.
 
 Сделано
 - Encoder burst, ISR короткий, loop: input first.
-- Deferred SI4735: AM/FM debounce 70 ms; SSB/CW deadline 10 ms (`g_rfPendingSince`), commit и пока крутят. 400 kHz только на пакет commit.
+- Deferred SI4735: AM/FM debounce 70 ms; SSB/CW deadline 10 ms; 400 kHz только на пакет commit.
 - Нет delay() на крутилке и в seek-колбэке.
 - RDS / S-метр / заряд не ходят по I2C, пока крутится encoder.
 - Dirty mark/flush для частоты.
-- Слои NORMAL / FOCUS / TRANSIENT. Press: STEP → VOL → BFO → MAIN (частота только rotate). TRANSIENT press и timeout 1.2 с → MAIN.
-- MENU: RADIO / DISP / AUDIO / SYS. BandDn вход/выход. Press = войти / править. Long энкодера и BandUp = назад. AM/FM long = seek; SSB/CW long = MENU.
-- Seek AM/FM: длинное нажатие энкодера.
-- S-метр всегда под частотой (page 5); 7-seg pages 2–4. Порядок MODE → FREQ → SIGNAL.
-- SSB idle: спокойный BFO справа на page 6 (без % батареи на этой строке).
-- FM: «ST» при пилоте. Полный RDS выключен (`USE_RDS 0`) — flash. MODE на FM больше не переключает RDS.
+- Слои NORMAL / FOCUS / TRANSIENT. Press: STEP → VOL → BFO → MAIN. TRANSIENT press и timeout 1.2 с → MAIN.
+- MENU: RADIO / DISP / AUDIO / SYS. BandDn вход/выход. Press войти/править. Long и BandUp = назад. AM/FM long = seek; SSB/CW long = MENU.
+- S-метр page 5; 7-seg 2–4. SSB idle BFO на page 6.
+- FM: ST по пилоту. USE_RDS 0.
 - Splash v2.0b, (C) OOMAN / Cursor 2026.
-- Шаг AM и SSB раздельный (`g_stepIndexAM` / `g_stepIndexSSB`). EEPROM APP_VERSION 123.
-- ANB: свитч Settings, DSP Si473x (0x3900…04), AM/SSB/CW. Off = порог 0.
-- SQL: AM RSSI-порог 0…60, `setAudioMute` по фронту. Не спорит с VOL mute. Не опрашивает шину на крутилке.
-- Автогашение OLED: Settings `DIS` Off / 15s / 30s / 60s / 2m. Первый жест только будит экран. AGC по-прежнему ручной on/off. SQL при погашенном экране продолжает опрос.
-- CW pitch: Settings `CWP` 500/600/700/800 Hz (по умолчанию 700). Смещение BFO только в CW, циферблат без pitch. `CW` по-прежнему LSB/USB.
+- Шаг AM/SSB раздельный. EEPROM APP_VERSION 123.
+- ANB, SQL (AM), DIS, CWP. build.sh → build/uno (не в git).
+- Радио: radio.cpp C-функции, не класс. Draw в .ino.
 
 Компромиссы
-- Одна secondary-строка (page 6), не две как на макете Sweet Spot.
-- Нет иерархии SETTINGS: есть MENU RADIO/DISP/AUDIO/SYS. RDS-категории нет (`USE_RDS 0`).
-- Радио: механический split (`radio.cpp` / `radio.h`, те же C-функции, без классов). Состояние в `globals.cpp`.
-- Переключение PS/RT/PTY энкодером убрано вместе с полным RDS.
-- Pong из форка diqezit не берём.
+- Одна secondary-строка (page 6).
+- g_cmd* + g_uiFocus + g_menuLevel — три измерения; не склеивать в один enum без avr-size.
+- Дублирование doFrequencyTune / TuneSSB дешевле DRY-слоя.
+- RDS-категории в MENU нет. Pong не берём.
 
 Flash / RAM
-- До split: 31600 / 32256 flash, 1216 SRAM.
-- После MENU: 31678 / 32256 flash (+174), SRAM 1272. Запас ~578 B.
-- nm: isSSB теперь отдельный символ 0x16 (раньше полностью встраивался). doFrequencyTune / commitRadioFrequency / clampSSBBand / getSteps по-прежнему вlined. Живые: updateBFO 0x7A, loadSSBPatch 0x1EC, doFrequencyTuneSSB 0x1F2, applyBandConfiguration 0x598.
+- После MENU: 31678 / 32256 flash (~98%), SRAM 1272 (~62%). Запас ~578 B.
+- Дорогие вещи уже выкинуты: full RDS, Radio class, full-frame S-meter, delay-encoder, constant 400 kHz.
 
-Дальше (чужое — в нашу архитектуру: Sweet Spot UI, radio.cpp, без классов Radio)
-Полный RDS выключен. RDS MINI — если снова понадобится строка PS (~500 B).
-Acceleration 10/100/1k — если SSB всё ещё ступеньками.
-Полировка: ATS-20_reverse_port_ats-mini.txt.
-1. NACK/STOP изолированно (ATS-20_I2C_nack_stop.txt), не стек Mini; glitch = откат.
-2. currentCmd — только с avr-size до/после.
-MAIN|MENU уже граница operational/config. Draw≠Si473x как функции, не классы.
-Не брать: Pong, Active Command UI, GyverOLED как замена Tiny4kOLED.
-
-Оценка Radio-модуля
-Механический split сделан. Класс Radio / tuning.step() по-прежнему не писать: типично +200…600 B.
+Дальше
+P0 NACK→STOP (ATS-20_I2C_nack_stop.txt): 5 замеров; glitch или длиннее happy path = удалить.
+P1 currentCmd: только четыре g_cmd*; g_uiFocus можно оставить; avr-size до/после.
+P2 точечный cleanup Draw/radio, без классов.
+P3 acceleration 10/100/1k только после слуха.
+Не брать: sprite, themes, Wi-Fi, BLE, EiBi, scanner, light sleep, GyverOLED, Active Command.
 
 Железо
-- Короткий энкодер: STEP→VOL→BFO→MAIN. В MENU: rotate список, press войти/править.
-- Длинный энкодер: seek AM/FM; SSB/CW и внутри MENU — назад / открыть MENU.
-- MODE на FM: ничего (RDS снят). ST по пилоту.
-- AGC короткий: OLED on/off вручную, если экран уже включён. После автогашения любой жест только будит.
+- Короткий энкодер: STEP→VOL→BFO→MAIN. MENU: rotate список, press войти/править.
+- Длинный энкодер: seek AM/FM; SSB/CW и в MENU — назад / открыть MENU.
+- MODE на FM: ничего. AGC короткий: OLED on/off если экран уже включён.

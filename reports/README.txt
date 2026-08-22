@@ -6,14 +6,14 @@ reports/
 - ATS-20_next_generation_architecture_report.txt — Radio Core / UI Core, deferred tune, dirty OLED
 - ATS-20_UI_Sweet_Spot.txt — UI: NORMAL / FOCUS / TRANSIENT, frequency hero, design rules v0.1
 - ATS-20_UI_state_machine.txt — слои поверх MAIN, таблица состояний, encoder map (цель после базовых фич)
-- ATS-20_I2C_burst.txt — 400 кГц только коротким burst; Fast when touching, quiet when listening
-- ATS-20_SSB_I2C_burst.txt — SSB: UI rate ≠ RF rate, coalescing с deadline ~10 ms, не debounce 70 ms
-- ATS-20_S-meter_dirty.txt — S-meter: регион page 5, три частоты, не full redraw; quiet window vs RF
-- ATS-20_I2C_nack_stop.txt — изолированный NACK→STOP; четыре замера; glitch = откат
-- ATS-20_reverse_port_ats-mini.txt — полировка: v1.18 эталон, diqezit основа, Mini только идеи → 328P
+- ATS-20_I2C_burst.txt — текущая схема 100 / 400-пакет / 100 (не potential; история 965c5d3 отдельно)
+- ATS-20_SSB_I2C_burst.txt — SSB deadline 10 ms, не debounce
+- ATS-20_S-meter_dirty.txt — page 5; frozen unless hardware RF/perception problem
+- ATS-20_I2C_nack_stop.txt — P0: NACK→STOP; пять замеров; glitch / длиннее happy path = откат
+- ATS-20_reverse_port_ats-mini.txt — baseline 4fe59be; P0–P3; один эксперимент за раз
 
 Журнал ветки
 - ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы
 - ATS-20_UI_pixel_grid.txt — фактическая раскладка 128×64 в текущем коде
 
-Правило: новые решения по архитектуре и UI кратко дописывать в log, полные отчёты не переписывать.
+Правило: новые решения кратко в log. Один эксперимент = один commit = один avr-size = один hardware test.

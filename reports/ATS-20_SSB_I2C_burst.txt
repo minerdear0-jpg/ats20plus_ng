@@ -1,7 +1,9 @@
 ATS-20 SSB — I2C burst и coalescing с deadline
-Потенциальный выход, не текущий код. Ветка ATS-20Plus_next.
+Текущая архитектура HEAD (baseline 4fe59be). Ветка ATS-20Plus_next.
 Опора: ATS-20_I2C_burst.txt (шум / 100 vs 400), этот файл (ощущение SSB tuning).
-Сейчас в прошивке: desired в MCU, OLED сразу. SSB/CW: `RF_COMMIT_MS` 10 (окно с первого pending, не сброс на тик), commit и на крутилке (`saveAttempt`). AM/FM: debounce `FREQ_COMMIT_MS` 70. `commitRadioFrequency` — 400 kHz, сразу 100. Патч SSB 500 kHz. Acceleration ещё нет.
+В прошивке: desired в MCU, OLED сразу. SSB/CW: `RF_COMMIT_MS` 10 (deadline, не debounce).
+AM/FM: `FREQ_COMMIT_MS` 70. `commitRadioFrequency` — 400 kHz, сразу 100. Патч SSB 500 kHz.
+Acceleration нет и не добавлять превентивно.
 
 Главное
 

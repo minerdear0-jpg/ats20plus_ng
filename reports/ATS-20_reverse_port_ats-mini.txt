@@ -1,5 +1,7 @@
 ATS-20 reverse-port: ats-mini → ATmega328P
-Идея финальной полировки. Не текущий код. Ветка ATS-20Plus_next.
+Полировка. Baseline прошивки: 4fe59be. Ветка ATS-20Plus_next.
+Рамка уже в коде (encoder-first, radio.cpp, MENU, 100/400-пакет/100, S-meter page 5).
+Следующий невыполненный пункт очереди: P0 NACK/STOP.
 
 Три опоры, разные роли. Не смешивать.
 
@@ -80,35 +82,26 @@ ats-mini (github.com/esp32-si4732/ats-mini) сам честно стоит на 
 
 Идеи, которые сжимаются:
 
-A. Один контекст энкодера
-   Mini: currentCmd (FREQ / STEP / VOLUME / MENU / SETTINGS/…).
-   У нас: куча bool g_cmd* + g_uiFocus + g_menuLevel.
-   Сжать в один uint8_t/uint16_t command — возможно дешевле flash, чем шесть
-   флагов. Не класс CommandDispatcher.
+A. g_cmd* (не всё состояние в один enum)
+   Три измерения, не склеивать:
+     g_uiFocus              что делает encoder в MAIN
+     g_cmdVolume/Step/Bw/Band  какой transient визуально активен
+     g_settingsActive/g_menuLevel  configuration
+   Эксперимент P1: только четыре g_cmd* → компактное состояние.
+   g_uiFocus не уничтожать заранее. avr-size Flash+SRAM до/после.
+   Нулевой или отрицательный выигрыш = выбросить. LTO имеет право быть умнее.
 
 B. Operational vs configuration
-   Mini: isMenuMode vs isSettingsMode (CMD_BAND… vs CMD_BRT…).
-   У нас уже: MAIN transients (STEP/VOL/BFO/BW) vs MENU категории.
-   Не тащить sidebar/zoomMenu/TFT sprite. Иерархия 2 уровня достаточна.
+   Решено: APP → MAIN | MENU + transient/editing. Не Mini-контексты.
 
-C. Draw отделён от Si473x
-   Mini: drawFrequency / drawSMeter / drawLayout*.
-   У нас: showFrequency / showSMeter / uiFlush + dirty bits.
-   Усилить: layout как таблица регионов (page 5 S-meter), не спрайт.
-   См. ATS-20_S-meter_dirty.txt.
+C. Draw ↔ Si473x
+   Уже: radio.cpp vs show* в .ino. P2 = точечный cleanup, не DisplayManager.
 
-D. updateFrequency / updateBFO как единственная точка wrap
-   Mini: bool updateFrequency(int, wrap), updateBFO.
-   У нас размазано doFrequencyTune / doFrequencyTuneSSB / clampSSBBand.
-   Сжать осторожно: LTO и так inlines; новый слой легко +200 B.
+D. doFrequencyTune / TuneSSB
+   Дублирование дешевле абстракции (~+200 B). Не рефакторить ради DRY.
 
-E. clickHandler(cmd, shortPress)
-   Событие, не простыня loop(). На 328P: маленькая таблица (cmd, press) →
-   функция, без virtual. Только если loop() снова распухнет.
-
-F. NACK/STOP
-   Не Mini SI4735-fixed скопом. waitToSend() сейчас крутит requestFrom до CTS
-   без потолка. Исследование: ATS-20_I2C_nack_stop.txt.
+E. NACK/STOP
+   P0. ATS-20_I2C_nack_stop.txt. Пять замеров. Happy path не длиннее.
 
 Идеи Mini, которые НЕ стоят байтов на ATS-20:
 
@@ -123,27 +116,22 @@ Digit-select частоты (doSelectDigit) — спорно: на 7-seg мож�
 и ломает «rotate = частота». Отложить.
 
 ------------------------------------------------------------------------
-4. Очередь (согласовано)
+4. Backlog (один эксперимент = один commit = один avr-size = один hardware test)
 
-1. NACK/STOP — изолированно. ATS-20_I2C_nack_stop.txt.
-   Не стек Mini. Критерий: четыре замера; audio glitch = откат.
-2. currentCmd — один uint8_t вместо роя g_cmd*. Только если avr-size
-   Flash+SRAM до/после лучше или не хуже. Без субъективных «стало чище».
-3. Draw ↔ Si473x — граница функций, не framework:
-     radio_update / commit  не рисует экран;
-     ui_draw_*              не ходит на Si473x.
-   Уже почти так (radio.cpp vs show*). Довести, без DisplayManager.
-4. operational vs config — решено: APP → MAIN | MENU + transient/editing.
-   Не импортировать Mini currentCmd-меню как систему контекстов.
+Baseline прошивки: 4fe59be. Не менять несколько подсистем сразу.
 
-Acceleration 10/100/1k — слух SSB, отдельно от этой очереди.
+P0. NACK→STOP изолированно. Пять замеров. Не выигрывает — удалить.
+P1. currentCmd: только g_cmdVolume/Step/Bw/Band. g_uiFocus можно оставить.
+    avr-size до/после. Flash↓ SRAM↓ или Flash не растёт и SRAM↓ — оставить.
+    Иначе выбросить.
+P2. Draw/radio: точечный cleanup границ функций. Без классов и event bus.
+P3. SSB acceleration 10/100/1k — только если после слуха 10 ms всё ещё ступени.
+
+S-meter frozen unless perceptual/RF problem on hardware.
 
 ------------------------------------------------------------------------
 5. Чего не делаем (класс продукта, не полировка)
 
 sprite; themes; Wi-Fi; BLE; EiBi; огромная memory/config;
 scanner graphics; ESP32 light sleep; TFT-oriented rendering.
-Класс Radio / EventBus / Renderer.
-
-Не сверять успех с Mini на цветном экране.
-Не забывать v1.18: крутилка и SSB в руках.
+Класс Radio / EventBus / Renderer / DRY-слой на tune SSB.

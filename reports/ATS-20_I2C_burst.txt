@@ -1,13 +1,21 @@
 ATS-20 I2C noise budget — burst 400 kHz
-Потенциальный выход, не текущий код. Ветка ATS-20Plus_next.
-Сейчас: I2C_RUN_HZ = 100 kHz после патча SSB (патч уже 500 kHz коротким окном).
-`commitRadioFrequency` поднимает 400 (`I2C_FAST_HZ`) только на пакет SET FREQ/BFO, сразу 100.
-История: `965c5d3` держал 400 кГц глобально вместе с encoder-first. Это снято.
-Не путать HEAD с тем коммитом: сейчас не «400 постоянно», а 100 NORMAL / 400 пакет / 100 QUIET.
-OLED, SQL, S-meter, VOL/BW без commit — по-прежнему 100. Следующий шаг той же схемы:
-обернуть короткие Si473x-команды (volume, BW, AGC) так же Fast→Quiet, не поднимать clock
-на всю сессию крутилки и не разгонять OLED.
+Ветка ATS-20Plus_next. Baseline прошивки: 4fe59be (плюс этот документ).
 
+История (не путать с HEAD)
+  965c5d3 — encoder-first и глобальные 400 кГц. Снято: гармоники SCL на СВ/КВ.
+
+Текущая архитектура (уже в коде, не «potential exit»)
+  NORMAL / QUIET   I2C_RUN_HZ 100 kHz
+  COMMIT           I2C_FAST_HZ 400 kHz только внутри commitRadioFrequency
+                   (SET FREQ / BFO), сразу 100
+  SSB patch        500 kHz коротким окном, затем 100
+
+OLED, SQL, S-meter, VOL/BW без commit — 100.
+Позже той же схемой: обернуть короткие Si473x-команды (volume, BW, AGC)
+Fast→Quiet. Не поднимать clock на всю сессию крутилки, не разгонять OLED.
+Это не P0: P0 = NACK/STOP, один эксперимент за раз.
+
+------------------------------------------------------------------------
 Принцип
 
 Fast when touching, quiet when listening.
@@ -32,59 +40,52 @@ I2C не передатчик, но на 400 кГц есть: крутые фр�
 Модель скоростей
 
 RADIO_QUIET / IDLE     100 kHz (кандидат quiet 50–61.5 как у diqezit на ДВ)
-USER_INTERACTION       400 kHz только на пакете команд
+COMMIT / пакет         400 kHz только на пакете команд
 RADIO_SETTLING         сразу 100 kHz
-SSB patch              уже 500 kHz, затем restore I2C_RUN_HZ — прецедент
+SSB patch              500 kHz, затем restore I2C_RUN_HZ
 
 Не Wire.setClock(400000) глобально.
 
-Интерактив (частота, BW, BFO, mode, AGC/ATT, volume, band): burst 400.
+Интерактив частота: burst 400 в commitRadioFrequency.
 Фон (RSSI, SQL, S-meter, status poll): 100.
-Особо «видимые» на спектре последовательности: 100 или отложить.
-Экран как часть RF: ATS-20_S-meter_dirty.txt (quiet window, не full redraw).
+Экран как часть RF: ATS-20_S-meter_dirty.txt. S-meter frozen unless hardware
+test shows a perceptual/RF problem.
 
 Batch: SET FREQ + status в одном окне fast, не чередовать wait/I2C/wait.
 
 ------------------------------------------------------------------------
 Связь с UI / radio.cpp
 
-Уже есть: encoder first, OLED сразу, SI4735 через FREQ_COMMIT_MS,
-фон не ходит по шине пока крутится крутилка. Burst 400 ложится на
-TRANSIENT / commitRadioFrequency, не на showSMeter / RDS.
+Encoder first, OLED сразу, фон не ходит по шине пока крутится крутилка.
+SSB: RF_COMMIT_MS 10 — deadline с первого pending, не debounce.
+AM/FM: FREQ_COMMIT_MS 70 debounce после последнего тика.
+S-meter / SQL / RDS / battery не лезут в I2C на крутилке.
+Acceleration 10/100/1k — только после слуха, не превентивно.
 
-После отпускания энкодера: settle → commit → QUIET.
 Не держать 400 кГц десятки ms «на всякий случай».
 
-SSB: `RF_COMMIT_MS` 10 с первого pending; AM/FM debounce 70. 400 кГц только в `commitRadioFrequency`, сразу 100.
-Acceleration 10/100/1k ещё нет.
-
-Профили (позже, не RSSI-автомат вслепую):
+Профили (не RSSI-автомат вслепую, не сейчас):
   RF_QUIET     100k, реже OLED, агрессивный sleep
   INTERACTIVE  400k burst + активный дисплей
   NORMAL       100k, периодический status
   SCAN         отдельный короткий burst
 
 ------------------------------------------------------------------------
-Как писать в нашей архитектуре (когда дойдём)
+Код
 
-Не класс I2CFastBurst: flash и LTO. Две C-функции рядом с radio.cpp:
+Clock уже setI2CFastModeCustom вокруг commit. Отдельные i2cFast()/i2cQuiet()
+не обязательны, если avr-size не выиграет. Фон SQL/S-метр fast не включают.
 
-  i2cQuiet()  → setI2CFastModeCustom(I2C_RUN_HZ) или I2C_QUIET_HZ
-  i2cFast()   → setI2CFastModeCustom(400000L)
+NACK/STOP ортогонально скорости: ATS-20_I2C_nack_stop.txt. Один commit.
 
-Вызов только вокруг интерактивного пакета; в finally-пути всегда Quiet
-(в т.ч. если команда оборвалась). Фон SQL/S-метр/RDS fast не включают.
-
-NACK/STOP как у diqezit (microWire) — ортогонально скорости; брать отдельно.
-
-Проверка на железе: ДВ 9 кГц, КВ слабый SSB, крутилка vs idle,
-спектр/слух до и после. Если burst слышен на ДВ — сузить окно или
-оставить 100 на LW/MW.
+Проверка на железе: ДВ 9 кГц, КВ слабый SSB, крутилка vs idle.
+Если burst слышен на ДВ — сузить окно или оставить 100 на LW/MW.
 
 ------------------------------------------------------------------------
 Не делать
 
 Постоянные 400 кГц «потому что быстрее UI».
 Переключатель в Settings «I2C 400» как основной UX.
-RAII-класс ради скобок, если avr-size съест запас (~248 B на момент SQL).
+RAII-класс ради скобок.
 Привязка 400/100 напрямую к RSSI без профиля чувствительности.
+Несколько подсистем в одном эксперименте.

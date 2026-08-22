@@ -1,5 +1,11 @@
 ATS-20 S-meter — dirty region и помехи
-Потенциальный выход, не текущий код. Ветка ATS-20Plus_next.
+Текущая реализация + policy. Ветка ATS-20Plus_next. Baseline 4fe59be.
+
+Policy: S-meter implementation frozen unless hardware testing shows a
+perceptual/RF problem. Не трогать ради эстетики (EMA, delta-ramp, compositor).
+
+Уже есть: page 5 only; skip OLED при том же кванте; нет I2C шкалы на крутилке;
+SQL на том же RSSI; нет полного framebuffer.
 Опора: ATS-20_I2C_burst.txt, ATS-20_SSB_I2C_burst.txt, ATS-20_UI_pixel_grid.txt.
 Проблема не в том, что «графический S-meter слишком сложный».
 Проблема — полный redraw как реакция на RSSI.
@@ -143,19 +149,11 @@ Scheduler: что стоит отправить на экран прямо се�
   SQL на том же RSSI, что и шкала;
   dirty mark частоты отдельно от шкалы.
 
-Нет:
-  IIR/EMA;
-  partial ramp (только изменившиеся колонки);
-  явная очередь P0–P4;
-  quiet window после RF commit;
-  RAM overlay (и не планировать 1–2 КБ кадра).
+Нет (и не делать без hardware fail):
+  IIR/EMA; delta-ramp; compositor-приоритеты; RAM overlay.
 
-Когда дойдём (avr-size, после CW / SSB deadline по журналу):
-  1. Не ломать page-5-only и skip-if-same.
-  2. Quiet window: не мешать S-meter poll с `commitRadioFrequency`.
-  3. Если дрожь сегментов — EMA, затем снова квант.
-  4. Если шкала «дорогая» на слух — слать только delta ramp.
-  5. Не заводить полный framebuffer и pixel-diff.
+Когда дойдём — только если hardware test показал проблему. Не рефакторить
+ради DRY/эстетики. Не заводить полный framebuffer и pixel-diff.
 
 Не делать:
   clear+full redraw на RSSI;
