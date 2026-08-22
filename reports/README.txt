@@ -9,8 +9,9 @@ reports/
 - ATS-20_I2C_burst.txt — текущая схема 100 / 400-пакет / 100 (не potential; история 965c5d3 отдельно)
 - ATS-20_SSB_I2C_burst.txt — SSB deadline 10 ms, не debounce
 - ATS-20_S-meter_dirty.txt — page 5; frozen unless hardware RF/perception problem
-- ATS-20_I2C_nack_stop.txt — P0: NACK→STOP; пять замеров; glitch / длиннее happy path = откат
+- ATS-20_I2C_nack_stop.txt — P0: bounded wait; NACK/STOP — способ; пять замеров
 - ATS-20_reverse_port_ats-mini.txt — baseline 4fe59be; P0–P3; один эксперимент за раз
+- ATS-20Plus_next_gaps.txt — срез архива: bounded I2C, CLKPR, dead state, battery 0%
 
 Журнал ветки
 - ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы

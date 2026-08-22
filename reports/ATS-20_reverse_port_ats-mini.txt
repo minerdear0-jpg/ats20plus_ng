@@ -1,7 +1,7 @@
 ATS-20 reverse-port: ats-mini → ATmega328P
 Полировка. Baseline прошивки: 4fe59be. Ветка ATS-20Plus_next.
 Рамка уже в коде (encoder-first, radio.cpp, MENU, 100/400-пакет/100, S-meter page 5).
-Следующий невыполненный пункт очереди: P0 NACK/STOP.
+Следующее: P0.5 CLKPR 50% на железе; слух/NACK/RADIO ERR.
 
 Три опоры, разные роли. Не смешивать.
 
@@ -100,8 +100,9 @@ C. Draw ↔ Si473x
 D. doFrequencyTune / TuneSSB
    Дублирование дешевле абстракции (~+200 B). Не рефакторить ради DRY.
 
-E. NACK/STOP
-   P0. ATS-20_I2C_nack_stop.txt. Пять замеров. Happy path не длиннее.
+E. Bounded wait
+   P0. Цель: нет unbounded waitToSend. NACK/STOP — кандидат.
+   ATS-20_I2C_nack_stop.txt. Пять замеров. Happy path не длиннее.
 
 Идеи Mini, которые НЕ стоят байтов на ATS-20:
 
@@ -120,14 +121,9 @@ Digit-select частоты (doSelectDigit) — спорно: на 7-seg мож�
 
 Baseline прошивки: 4fe59be. Не менять несколько подсистем сразу.
 
-P0. NACK→STOP изолированно. Пять замеров. Не выигрывает — удалить.
-P1. currentCmd: только g_cmdVolume/Step/Bw/Band. g_uiFocus можно оставить.
-    avr-size до/после. Flash↓ SRAM↓ или Flash не растёт и SRAM↓ — оставить.
-    Иначе выбросить.
-P2. Draw/radio: точечный cleanup границ функций. Без классов и event bus.
-P3. SSB acceleration 10/100/1k — только если после слуха 10 ms всё ещё ступени.
+P0–P3 в коде (avr-size 31996 flash / 1289 SRAM). P0.5 CLKPR — только железо.
 
-S-meter frozen unless perceptual/RF problem on hardware.
+S-meter frozen: dirty-region, не dirty-pixel.
 
 ------------------------------------------------------------------------
 5. Чего не делаем (класс продукта, не полировка)

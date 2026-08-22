@@ -320,7 +320,7 @@ void markFreqPending()
 
 void servicePendingTune()
 {
-    if (!g_processFreqChange)
+    if (g_radioError || !g_processFreqChange)
         return;
     uint32_t t0 = isSSB() ? g_rfPendingSince : g_lastFreqChange;
     uint16_t wait = isSSB() ? (uint16_t)RF_COMMIT_MS : (uint16_t)FREQ_COMMIT_MS;
@@ -330,6 +330,11 @@ void servicePendingTune()
 
 void commitRadioFrequency()
 {
+    if (g_radioError)
+    {
+        g_processFreqChange = false;
+        return;
+    }
     g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
     if (isSSB())
     {
@@ -347,4 +352,19 @@ void commitRadioFrequency()
         g_si4735.setFrequency(g_currentFrequency);
     g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
     g_processFreqChange = false;
+}
+
+extern "C" void si4735OnBusFail(void)
+{
+    g_radioError = 1;
+}
+
+void retryRadio()
+{
+    g_radioError = 0;
+    g_si4735.reset();
+    delay(50);
+    applyBandConfiguration();
+    g_si4735.setVolume(g_volume);
+    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }

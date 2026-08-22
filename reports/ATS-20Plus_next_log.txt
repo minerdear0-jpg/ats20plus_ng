@@ -7,7 +7,8 @@ Baseline прошивки: 4fe59be (build.sh). Дальше: один экспе
 I2C (уже архитектура, не план): 100 kHz NORMAL/QUIET; 400 kHz только пакет commitRadioFrequency; патч SSB 500 kHz. История глобальных 400: 965c5d3, снято.
 SSB: deadline 10 ms (`g_rfPendingSince`), не debounce. Фон (S-meter/SQL/RDS/battery) не на крутилке.
 S-meter: frozen unless hardware test shows perceptual/RF problem.
-Опора: спецификации в этом каталоге. UI: ATS-20_UI_state_machine.txt поверх Sweet Spot.
+Dirty = dirty-region (page 5), не dirty-pixel; смена val → весь ramp 114.
+Опора: спецификации + ATS-20Plus_next_gaps.txt. UI: ATS-20_UI_state_machine.txt поверх Sweet Spot.
 
 Сделано
 - Encoder burst, ISR короткий, loop: input first.
@@ -17,7 +18,11 @@ S-meter: frozen unless hardware test shows perceptual/RF problem.
 - Dirty mark/flush для частоты.
 - Слои NORMAL / FOCUS / TRANSIENT. Press: STEP → VOL → BFO → MAIN. TRANSIENT press и timeout 1.2 с → MAIN.
 - MENU: RADIO / DISP / AUDIO / SYS. BandDn вход/выход. Press войти/править. Long и BandUp = назад. AM/FM long = seek; SSB/CW long = MENU.
-- S-метр page 5; 7-seg 2–4. SSB idle BFO на page 6.
+- S-метр page 5; secondary page 6 STEP/BW, page 7 BFO/VOL/charge.
+- g_currentCmd (VOL/STEP/BW/BAND/MODE). g_sMeterOn и prev/prevFunc сняты.
+- waitToSend: потолок ~50 ms / NACK (build.sh патчит PU2CLR). RADIO ERR, encoder press = retry.
+- Первый battery sample больше не 0%.
+- MODE: overlay, encoder ◀ mode ▶, не мгновенный цикл кнопкой.
 - FM: ST по пилоту. USE_RDS 0.
 - Splash v2.0b, (C) OOMAN / Cursor 2026.
 - Шаг AM/SSB раздельный. EEPROM APP_VERSION 123.
@@ -25,23 +30,26 @@ S-meter: frozen unless hardware test shows perceptual/RF problem.
 - Радио: radio.cpp C-функции, не класс. Draw в .ino.
 
 Компромиссы
-- Одна secondary-строка (page 6).
-- g_cmd* + g_uiFocus + g_menuLevel — три измерения; не склеивать в один enum без avr-size.
+- Header: MODE + ST. VOL/BW на secondary, не в шапке.
+- g_uiFocus + g_currentCmd + MENU — по-прежнему три измерения.
 - Дублирование doFrequencyTune / TuneSSB дешевле DRY-слоя.
 - RDS-категории в MENU нет. Pong не берём.
+- P0.5 CLKPR 50%: код жив, на железе не проверено.
 
 Flash / RAM
-- После MENU: 31678 / 32256 flash (~98%), SRAM 1272 (~62%). Запас ~578 B.
-- Дорогие вещи уже выкинуты: full RDS, Radio class, full-frame S-meter, delay-encoder, constant 400 kHz.
+- После MENU (4fe59be): 31678 flash, SRAM 1272.
+- После P0–P3 (этот срез): 31996 / 32256 flash (~99%), SRAM 1289 (~63%). Запас ~260 B.
+- P0–P3 одним проходом кода (не 7 отдельных avr-size). Слух/NACK/CLKPR — hardware.
 
 Дальше
-P0 NACK→STOP (ATS-20_I2C_nack_stop.txt): 5 замеров; glitch или длиннее happy path = удалить.
-P1 currentCmd: только четыре g_cmd*; g_uiFocus можно оставить; avr-size до/после.
-P2 точечный cleanup Draw/radio, без классов.
-P3 acceleration 10/100/1k только после слуха.
-Не брать: sprite, themes, Wi-Fi, BLE, EiBi, scanner, light sleep, GyverOLED, Active Command.
+P0.5 CLKPR 50% на железе (millis, I2C, 10/70/1200 ms).
+Hardware: NACK/CTS timeout, RADIO ERR retry, MODE overlay, battery %, SSB secondary.
+DROP acceleration, Mini GUI, framebuffer, S-meter pixel-diff.
+g_uiFreqClean: uiMark(..., true) по-прежнему не вызывается.
 
 Железо
 - Короткий энкодер: STEP→VOL→BFO→MAIN. MENU: rotate список, press войти/править.
+- MODE (не FM): overlay; крутилка меняет модуляцию; press/timeout → MAIN.
+- BAND: overlay; крутилка сегменты.
+- RADIO ERR: press энкодера или MODE = retry.
 - Длинный энкодер: seek AM/FM; SSB/CW и в MENU — назад / открыть MENU.
-- MODE на FM: ничего. AGC короткий: OLED on/off если экран уже включён.

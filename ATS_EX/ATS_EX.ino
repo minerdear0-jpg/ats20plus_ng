@@ -28,6 +28,10 @@ void uiFlush();
 void paintTransient(const char* title, const char* value);
 void restoreIdleHeader();
 void showBfoIdle();
+void showRadioError();
+void switchCommand(uint8_t cmd = CMD_NONE, void (*showFunction)() = 0);
+void stepMode(int8_t dir);
+void paintModeOrBand();
 
 int getLastStep()
 {
@@ -186,6 +190,8 @@ void setup()
     //Draw main screen
     oled.clear();
     showStatus();
+    if (g_radioError)
+        showRadioError();
     g_lastInputMs = millis();
 }
 
@@ -569,8 +575,10 @@ void updateLowerDisplayLine()
     oledClearLine(UI_PAGE_SECONDARY);
     showModulation();
     showStep();
+    showBandwidth();
     showCharge(true);
     showBfoIdle();
+    showVolume();
 }
 
 //Converts settings value to UI value
@@ -888,9 +896,22 @@ void paintTransient(const char* title, const char* value)
     g_uiLayer = UI_LAYER_TRANSIENT;
 }
 
+void showRadioError()
+{
+    oledPrint("RADIO ERR", 0, 0, DEFAULT_FONT, true);
+}
+
+void paintModeOrBand()
+{
+    if (g_currentCmd == CMD_MODE)
+        paintTransient("MODE", g_bandModeDesc[g_currentMode]);
+    else if (g_currentCmd == CMD_BAND)
+        paintTransient("BAND", (g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH) ? "CB" : bandTags[g_bandIndex]);
+}
+
 void showModulation()
 {
-    oledPrint(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_cmdBand && g_currentMode == FM);
+    oledPrint(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_currentCmd == CMD_BAND && g_currentMode == FM);
     oled.print(" ");
     if (isSSB() && g_Settings[SettingsIndex::Sync].param == 1)
         oledPrint("S", -1, -1, LastFont, true);
@@ -905,10 +926,10 @@ void showModulation()
 //Draw current band
 void showBandTag()
 {
-    if (g_sMeterOn || g_displayRDS)
+    if (g_displayRDS)
         return;
 
-    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, UI_PAGE_SECONDARY, DEFAULT_FONT, g_cmdBand && g_currentMode != FM);
+    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_BAND && g_currentMode != FM);
 }
 
 //Draw volume level
@@ -927,13 +948,13 @@ void showVolume()
         buf[2] = 0;
     }
 
-    if (g_cmdVolume && g_uiLayer == UI_LAYER_TRANSIENT)
+    if (g_currentCmd == CMD_VOLUME && g_uiLayer == UI_LAYER_TRANSIENT)
     {
         paintTransient("VOL", buf);
         return;
     }
 
-    oledPrint(buf, (128 - (8 * 2) + 2 - 6), 0, DEFAULT_FONT, g_cmdVolume);
+    oledPrint(buf, 80, UI_PAGE_SECONDARY2, DEFAULT_FONT, g_currentCmd == CMD_VOLUME);
 }
 
 //Draw battery charge
@@ -968,6 +989,8 @@ void showCharge(bool forceShow)
 
     if ((millis() - lastChargeShow) > 10000 || forceShow)
     {
+        if (forceShow && averageSamples == 0)
+            averageSamples = sample;
         uint16_t currentSamples = (uint16_t)averageSamples;
         uint8_t percents = 0;
         for (uint8_t i = 0; i < rows; i++)
@@ -987,12 +1010,12 @@ void showCharge(bool forceShow)
         if (il < 3)
             buf[2] = '%';
 
-        if (!g_settingsActive && !g_sMeterOn && !g_displayRDS && !isSSB())
+        if (!g_settingsActive && !g_displayRDS && !isSSB())
         {
             static uint8_t lastPct = 255;
             if (forceShow || percents != lastPct)
             {
-                oledPrint(buf, 102, UI_PAGE_SECONDARY, DEFAULT_FONT);
+                oledPrint(buf, 102, UI_PAGE_SECONDARY2, DEFAULT_FONT);
                 lastPct = percents;
             }
         }
@@ -1076,11 +1099,8 @@ void showRDS()
 //Draw steps (with units)
 void showStep()
 {
-    if (g_sMeterOn || g_displayRDS)
-    {
-        if (!g_cmdStep)
-            return;
-    }
+    if (g_displayRDS && g_currentCmd != CMD_STEP)
+        return;
 
     char buf[5];
     if (g_currentMode == FM)
@@ -1120,14 +1140,14 @@ void showStep()
         }
     }
 
-    uint8_t off = 50;
-    if (g_cmdStep && g_uiLayer == UI_LAYER_TRANSIENT)
+    uint8_t off = 40;
+    if (g_currentCmd == CMD_STEP && g_uiLayer == UI_LAYER_TRANSIENT)
     {
         paintTransient("STEP", buf);
         return;
     }
-    oledPrint("St:", off - 16, UI_PAGE_SECONDARY, DEFAULT_FONT, g_cmdStep);
-    oledPrint(buf, off + 8, UI_PAGE_SECONDARY, DEFAULT_FONT, g_cmdStep);
+    oledPrint("St:", off, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_STEP);
+    oledPrint(buf, off + 24, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_STEP);
 }
 
 void showSMeter()
@@ -1228,12 +1248,12 @@ void showBandwidth()
         bw = (char*)g_bandwidthFM[g_bwIndexFM];
     }
 
-    if (g_cmdBw && g_uiLayer == UI_LAYER_TRANSIENT)
+    if (g_currentCmd == CMD_BW && g_uiLayer == UI_LAYER_TRANSIENT)
     {
         paintTransient("BW", bw);
         return;
     }
-    oledPrint(bw, 45, 0, DEFAULT_FONT, g_cmdBw);
+    oledPrint(bw, 96, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_BW);
 }
 
 void restoreIdleHeader()
@@ -1244,8 +1264,8 @@ void restoreIdleHeader()
     oled.setCursor(0, 1);
     oled.fillLength(0, 128);
     showModulation();
-    showVolume();
     showBandwidth();
+    showVolume();
 }
 
 void formatBfo(char* buf)
@@ -1264,7 +1284,7 @@ void showBfoIdle()
         return;
     char buf[7];
     formatBfo(buf);
-    oledPrint(buf, 80, UI_PAGE_SECONDARY, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
+    oledPrint(buf, 0, UI_PAGE_SECONDARY2, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
 }
 
 void paintBfoTransient()
@@ -1282,10 +1302,7 @@ void cycleEncoderFocus()
     if (next > FOCUS_BFO)
         next = FOCUS_FREQ;
 
-    g_cmdStep = false;
-    g_cmdVolume = false;
-    g_cmdBw = false;
-    g_cmdBand = false;
+    g_currentCmd = CMD_NONE;
     restoreIdleHeader();
     g_uiFocus = next;
     showStep();
@@ -1302,13 +1319,13 @@ void cycleEncoderFocus()
     if (next == FOCUS_STEP)
     {
         g_uiLayer = UI_LAYER_FOCUS;
-        g_cmdStep = true;
+        g_currentCmd = CMD_STEP;
         showStep();
     }
     else if (next == FOCUS_VOL)
     {
         g_uiLayer = UI_LAYER_FOCUS;
-        g_cmdVolume = true;
+        g_currentCmd = CMD_VOLUME;
         showVolume();
     }
     else
@@ -1397,12 +1414,6 @@ void bandSwitch(bool up)
                 g_bandIndex--;
             else
                 g_bandIndex = g_lastBand;
-        }
-
-        if (g_sMeterOn)
-        {
-            g_sMeterOn = false;
-            oledClearLine(UI_PAGE_SECONDARY);
         }
 
 #if USE_RDS
@@ -1610,6 +1621,7 @@ void doCPUSpeed(int8_t v = 0)
     CLKPR = 0x80;
     CLKPR = g_Settings[SettingsIndex::CPUSpeed].param;
     interrupts();
+    // CPU 50% keeps F_CPU=16e6 at compile; millis/TWI/deadlines scale. Needs hardware check (P0.5).
 }
 
 void doDisplayOff(int8_t v)
@@ -1694,7 +1706,6 @@ void doRDS()
 
     if (g_displayRDS)
     {
-        g_sMeterOn = false;
         oledClearLine(UI_PAGE_SECONDARY);
         g_si4735.getRdsStatus();
         showRDS();
@@ -1735,38 +1746,25 @@ void doBandwidth(uint8_t v)
     showBandwidth();
 }
 
-void switchCommand(bool* b, void (*showFunction)())
+void switchCommand(uint8_t cmd, void (*showFunction)())
 {
-    static bool* prev = NULL;
-    static void (*prevFunc)() = NULL;
-
-    if (!b)
+    if (cmd == CMD_NONE)
     {
-        g_cmdVolume = false;
-        g_cmdStep = false;
-        g_cmdBw = false;
-        g_cmdBand = false;
+        g_currentCmd = CMD_NONE;
         g_lastAdjustmentTime = 0;
         g_uiFocus = FOCUS_FREQ;
         restoreIdleHeader();
         showStep();
         showVolume();
         showBfoIdle();
-        prev = NULL;
-        prevFunc = NULL;
         return;
     }
 
-    bool last = *b;
-    prev = b;
-    prevFunc = showFunction;
+    bool last = (g_currentCmd == cmd);
 
-    if (*b == false)
+    if (!last)
     {
-        g_cmdVolume = false;
-        g_cmdStep = false;
-        g_cmdBw = false;
-        g_cmdBand = false;
+        g_currentCmd = CMD_NONE;
         g_lastAdjustmentTime = millis();
         showVolume();
         showStep();
@@ -1776,20 +1774,21 @@ void switchCommand(bool* b, void (*showFunction)())
     else
         g_lastAdjustmentTime = 0;
 
-    *b = !last;
+    g_currentCmd = last ? CMD_NONE : cmd;
 
-    if (*b)
+    if (g_currentCmd)
         g_uiLayer = UI_LAYER_FOCUS;
 
     if (showFunction)
         showFunction();
+    if (g_currentCmd == CMD_BAND || g_currentCmd == CMD_MODE)
+        paintModeOrBand();
 }
 
 void resetLowerLine()
 {
-    if (g_sMeterOn || g_displayRDS)
+    if (g_displayRDS)
     {
-        g_sMeterOn = false;
         g_displayRDS = false;
         updateLowerDisplayLine();
     }
@@ -1816,6 +1815,70 @@ void displaySleepIfDue()
         return;
     g_displayOn = false;
     oled.off();
+}
+
+void stepMode(int8_t dir)
+{
+    if (g_currentMode == FM || dir == 0)
+        return;
+
+    g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
+    g_prevMode = g_currentMode;
+
+    if (dir > 0)
+    {
+        switch (g_currentMode)
+        {
+        case AM:
+            loadSSBPatch();
+            g_processFreqChange = false;
+            g_currentMode = LSB;
+            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
+            break;
+        case LSB:
+            g_currentMode = USB;
+            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
+            break;
+        case USB:
+            g_currentMode = CW;
+            if (g_currentCmd == CMD_BW)
+                g_currentCmd = CMD_NONE;
+            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
+            break;
+        case CW:
+            g_currentMode = AM;
+            g_ssbLoaded = false;
+            g_currentFrequency += (g_currentBFO / 1000);
+            break;
+        }
+    }
+    else
+    {
+        switch (g_currentMode)
+        {
+        case AM:
+            loadSSBPatch();
+            g_processFreqChange = false;
+            g_currentMode = CW;
+            break;
+        case LSB:
+            g_currentMode = AM;
+            g_ssbLoaded = false;
+            g_currentFrequency += (g_currentBFO / 1000);
+            break;
+        case USB:
+            g_currentMode = LSB;
+            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
+            break;
+        case CW:
+            g_currentMode = USB;
+            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
+            break;
+        }
+    }
+
+    g_bandList[g_bandIndex].currentStepIdx = g_stepIndexAM;
+    applyBandConfiguration();
 }
 
 void loop()
@@ -1867,27 +1930,35 @@ void loop()
                 DrawSetting(idx, (uint8_t)g_SettingSelected - menuScrollTop(), false);
             }
         }
-        else if (g_cmdVolume)
+        else if (g_radioError)
+            ;
+        else if (g_currentCmd == CMD_VOLUME)
         {
             g_uiLayer = UI_LAYER_TRANSIENT;
             doVolume(g_encoderCount);
         }
-        else if (g_cmdStep)
+        else if (g_currentCmd == CMD_STEP)
         {
             g_uiLayer = UI_LAYER_TRANSIENT;
             doStep(g_encoderCount);
         }
-        else if (g_cmdBw)
+        else if (g_currentCmd == CMD_BW)
         {
             g_uiLayer = UI_LAYER_TRANSIENT;
             doBandwidth(g_encoderCount);
         }
-        else if (g_cmdBand)
+        else if (g_currentCmd == CMD_BAND)
         {
             if (g_encoderCount > 0)
                 bandSwitch(true);
             else
                 bandSwitch(false);
+            paintModeOrBand();
+        }
+        else if (g_currentCmd == CMD_MODE)
+        {
+            stepMode(g_encoderCount);
+            paintModeOrBand();
         }
         else if (g_uiFocus == FOCUS_BFO && isSSB())
         {
@@ -1919,7 +1990,7 @@ void loop()
         poke |= btn_Mode.checkEvent(simpleEvent);
         if (poke)
             displayWake();
-        else if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
+        else if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS && !g_radioError)
             applySquelchNow();
         goto saveAttempt;
     }
@@ -1927,7 +1998,7 @@ void loop()
     servicePendingTune();
     uiFlush();
 
-    if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
+    if (!g_radioError && millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
     {
 #if USE_RDS
         showRDS();
@@ -1940,20 +2011,20 @@ void loop()
     }
 
     if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT)
-        switchCommand(NULL, NULL);
+        switchCommand();
 
     //Command-checkers
     if (BUTTONEVENT_SHORTPRESS == btn_Bandwidth.checkEvent(simpleEvent))
     {
         if (!g_settingsActive && g_currentMode != CW)
-            switchCommand(&g_cmdBw, showBandwidth);
+            switchCommand(CMD_BW, showBandwidth);
     }
     if (BUTTONEVENT_SHORTPRESS == btn_BandUp.checkEvent(bandEvent))
     {
         if (!g_settingsActive)
         {
             resetLowerLine();
-            switchCommand(&g_cmdBand, showModulation);
+            switchCommand(CMD_BAND, showModulation);
         }
         else
         {
@@ -1963,18 +2034,18 @@ void loop()
     if (BUTTONEVENT_SHORTPRESS == btn_BandDn.checkEvent(bandEvent))
     {
         if (!g_settingsActive)
-            switchCommand(NULL, NULL);
+            switchCommand();
         g_settingsActive = !g_settingsActive;
         switchSettings();
     }
     if (BUTTONEVENT_SHORTPRESS == btn_VolumeUp.checkEvent(volumeEvent))
     {
         if (!g_settingsActive && g_muteVolume == 0)
-            switchCommand(&g_cmdVolume, showVolume);
+            switchCommand(CMD_VOLUME, showVolume);
     }
     if (BUTTONEVENT_SHORTPRESS == btn_VolumeDn.checkEvent(volumeEvent))
     {
-        if (!g_cmdVolume)
+        if (g_currentCmd != CMD_VOLUME)
         {
             uint8_t vol = g_si4735.getCurrentVolume();
             if (vol > 0 && g_muteVolume == 0)
@@ -2010,8 +2081,13 @@ void loop()
                 showMenu();
             }
         }
+        else if (g_radioError)
+        {
+            retryRadio();
+            showStatus();
+        }
         else if (g_uiLayer == UI_LAYER_TRANSIENT)
-            switchCommand(NULL, NULL);
+            switchCommand();
         else
             cycleEncoderFocus();
     }
@@ -2023,7 +2099,7 @@ void loop()
             doSeek();
         else
         {
-            switchCommand(NULL, NULL);
+            switchCommand();
             g_settingsActive = true;
             switchSettings();
         }
@@ -2059,7 +2135,7 @@ void loop()
     {
         if (!g_settingsActive)
         {
-            switchCommand(&g_cmdStep, showStep);
+            switchCommand(CMD_STEP, showStep);
             resetLowerLine();
         }
     }
@@ -2075,45 +2151,25 @@ void loop()
     {
         if (!g_settingsActive)
         {
-            //Do nothing on FM mode (unfortunately no NBFM patch), otherwise switch AM modulation
-            if (g_currentMode != FM)
+            if (g_radioError)
             {
-                g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
-                g_prevMode = g_currentMode;
-                switch (g_currentMode)
-                {
-                case AM:
-                    //Patch Si473x memory every time when enabling SSB
-                    loadSSBPatch();
-                    g_processFreqChange = false;
-                    //Allow pass through
-
-                case LSB:
-                    g_currentMode++;
-                    g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-                    break;
-
-                case USB:
-                    g_currentMode++;
-                    g_cmdBw = false;
-                    g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-                    break;
-
-                case CW:
-                    g_currentMode = AM;
-                    g_ssbLoaded = false;
-
-                    g_currentFrequency += (g_currentBFO / 1000);
-                    break;
-                }
-
-                g_bandList[g_bandIndex].currentStepIdx = g_stepIndexAM;
-                applyBandConfiguration();
+                retryRadio();
+                showStatus();
             }
+            else if (g_currentMode == FM)
+            {
 #if USE_RDS
-            else
                 doRDS();
 #endif
+            }
+            else if (g_currentCmd == CMD_MODE)
+                switchCommand();
+            else
+            {
+                g_currentCmd = CMD_MODE;
+                g_lastAdjustmentTime = millis();
+                paintModeOrBand();
+            }
         }
     }
 

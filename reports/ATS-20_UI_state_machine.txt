@@ -149,4 +149,4 @@ MENU:          rotate selection, press enter, long back
 Сделано: частота только rotate в NORMAL; press = STEP→VOL→BFO→MAIN;
 TRANSIENT press и timeout (~1200 ms) → MAIN.
 MENU: RADIO / DISP / AUDIO / SYS; редактор пункта → снова список.
-◀ MODE ▶ / две secondary-строки — позже, pixel-проход.
+◀ MODE ▶ / две secondary-строки: MODE overlay + page 6/7 в коде; pixel-проход на железе.

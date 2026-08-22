@@ -12,11 +12,18 @@ extern bool g_voltagePinConnnected;
 extern bool g_ssbLoaded;
 extern bool g_fmStereo;
 
-extern bool g_cmdVolume;
-extern bool g_cmdStep;
-extern bool g_cmdBw;
-extern bool g_cmdBand;
+enum UiCmd : uint8_t
+{
+    CMD_NONE = 0,
+    CMD_VOLUME,
+    CMD_STEP,
+    CMD_BW,
+    CMD_BAND,
+    CMD_MODE
+};
+extern uint8_t g_currentCmd;
 extern bool g_settingsActive;
+extern uint8_t g_radioError;
 
 enum UiLayer : uint8_t
 {
@@ -52,7 +59,6 @@ inline void uiMark(uint8_t bits, bool freqClean = false)
     if (freqClean)
         g_uiFreqClean = true;
 }
-extern bool g_sMeterOn;
 extern uint8_t g_sMeterDrawnVal;
 extern bool g_displayOn;
 extern bool g_displayRDS;

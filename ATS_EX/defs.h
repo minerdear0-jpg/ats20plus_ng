@@ -64,10 +64,11 @@
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 1200
 
-// Sweet Spot pages: header/transient 0-1, 7-seg 2-4, S-meter 5, secondary 6-7.
+// Sweet Spot pages: header/transient 0-1, 7-seg 2-4, S-meter 5, secondary 6 then 7.
 #define UI_PAGE_FREQ 2
 #define UI_PAGE_SIGNAL 5
 #define UI_PAGE_SECONDARY 6
+#define UI_PAGE_SECONDARY2 7
 
 // Band settings
 #define SW_LIMIT_LOW		1710

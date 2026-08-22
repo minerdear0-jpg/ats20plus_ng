@@ -6,18 +6,15 @@ bool g_voltagePinConnnected = false;
 bool g_ssbLoaded = false;
 bool g_fmStereo = false;
 
-bool g_cmdVolume = false;
-bool g_cmdStep = false;
-bool g_cmdBw = false;
-bool g_cmdBand = false;
+uint8_t g_currentCmd = CMD_NONE;
 bool g_settingsActive = false;
+uint8_t g_radioError = 0;
 
 uint8_t g_uiDirty = 0;
 bool g_uiFreqClean = false;
 uint8_t g_uiLayer = 0;
 uint8_t g_uiFocus = 0;
 
-bool g_sMeterOn = false;
 uint8_t g_sMeterDrawnVal = 255;
 bool g_displayOn = true;
 bool g_displayRDS = false;

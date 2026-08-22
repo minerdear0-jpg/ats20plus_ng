@@ -4,6 +4,14 @@ ATS-20 S-meter — dirty region и помехи
 Policy: S-meter implementation frozen unless hardware testing shows a
 perceptual/RF problem. Не трогать ради эстетики (EMA, delta-ramp, compositor).
 
+Честная формулировка: S-meter dirty = dirty-region, не dirty-pixel.
+Skip OLED если val не менялся. Если менялся — вся page 5, ramp 114 колонок,
+не граница заполнения. Это дёшево по Flash/SRAM и предсказуемо для OLED.
+
+Idle FM: GET RSSI + getCurrentPilot — два I2C, не одна транзакция. Оставить.
+SQL в том же RSSI в showSMeter; applySquelchNow() — отдельный quality request
+при смене SQL. Не чинить.
+
 Уже есть: page 5 only; skip OLED при том же кванте; нет I2C шкалы на крутилке;
 SQL на том же RSSI; нет полного framebuffer.
 Опора: ATS-20_I2C_burst.txt, ATS-20_SSB_I2C_burst.txt, ATS-20_UI_pixel_grid.txt.
@@ -58,7 +66,7 @@ Page 5 целиком: 128 байт (+ команды адресации).
   S-meter value → quantize → segment index → if changed → update changed segment(s)
 
 Сейчас в коде при смене `val` уходит вся page 5 (глифы S/цифра/+ и ramp 114 колонок).
-Следующий шаг: если цифра S та же, слать только хвост ramp (start column = min(old,new)).
+Delta-ramp / dirty-pixel — не backlog. Freeze.
 
 ------------------------------------------------------------------------
 2. Не вешать OLED на сырой RSSI

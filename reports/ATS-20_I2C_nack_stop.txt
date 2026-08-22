@@ -4,6 +4,15 @@ ATS-20 I2C — NACK → STOP (изолированное исследовани�
 
 Цель
 
+  NO SI473x transaction
+          ↓
+     unbounded wait
+
+NACK → STOP — кандидат способа, не самоцель. Encoder-first ломается, если
+waitToSend крутится без потолка, пока крутилка ждёт CTS.
+
+Способ (если выигрывает):
+
   current I2C transaction
           ↓
        NACK?
@@ -13,6 +22,9 @@ ATS-20 I2C — NACK → STOP (изолированное исследовани�
      bus released
           ↓
      no unnecessary recovery traffic
+
+ERROR UI («RADIO ERR» / retry) не в этом патче. Сначала доказать, что
+сбой обнаруживается без раздувания библиотеки.
 
 Не «красивее ли код». Пять измерений:
 
@@ -47,9 +59,9 @@ AVR Wire.endTransmission() при NACK адреса/данных обычно у
   waitToSend крутится, пока крутилка и OLED ждут;
   после сбоя — лишний recovery (reset I2C, повтор пакета, delay).
 
-Изолированный патч: не форк библиотеки. Обёртка/лимит вокруг waitToSend
-и проверка endTransmission() только на путях commit / status.
-Не microWire целиком, не SI4735-fixed.h из Mini.
+Изолированный патч: tools/patch_si4735_wait.py + build.sh копирует PU2CLR
+в build/uno/lib и патчит только waitToSend (не Mini SI4735-fixed, не microWire).
+Потолок 167×300 µs. NACK: requestFrom==0 → callback, выход (Wire уже STOP).
 
 ------------------------------------------------------------------------
 Как исследовать (железо, один патч за раз)

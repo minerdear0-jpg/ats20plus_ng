@@ -26,3 +26,4 @@ void doFrequencyTuneSSB();
 void markFreqPending();
 void servicePendingTune();
 void commitRadioFrequency();
+void retryRadio();

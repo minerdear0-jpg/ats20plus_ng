@@ -77,7 +77,18 @@ OUT="${ROOT}/build/${TARGET}"
 TMP="${OUT}/tmp"
 mkdir -p "${OUT}" "${TMP}"
 
-CMD=(arduino-cli compile --fqbn "${FQBN}" --build-path "${TMP}" --output-dir "${OUT}" "${SKETCH}")
+SI4735_SRC="${HOME}/Arduino/libraries/PU2CLR_SI4735"
+PATCHED_SI4735="${OUT}/lib/PU2CLR_SI4735"
+if [[ ! -d "${SI4735_SRC}" ]]; then
+  echo "build.sh: PU2CLR SI4735 not in ${SI4735_SRC}" >&2
+  exit 1
+fi
+rm -rf "${PATCHED_SI4735}"
+mkdir -p "${OUT}/lib"
+cp -a "${SI4735_SRC}" "${PATCHED_SI4735}"
+python3 "${ROOT}/tools/patch_si4735_wait.py" "${PATCHED_SI4735}/src/SI4735.cpp"
+
+CMD=(arduino-cli compile --fqbn "${FQBN}" --library "${PATCHED_SI4735}" --build-path "${TMP}" --output-dir "${OUT}" "${SKETCH}")
 if [[ "${CLEAN}" -eq 1 ]]; then
   CMD+=(--clean)
 fi
