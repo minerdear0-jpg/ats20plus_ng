@@ -189,7 +189,7 @@ void setup()
 
     //Draw main screen
     oled.clear();
-    showStatus();
+    showStatus(true);
     if (g_radioError)
         showRadioError();
     g_lastInputMs = millis();
@@ -433,7 +433,6 @@ void showFrequency(bool cleanDisplay = false)
     static uint8_t prevLen = 0;
     static uint8_t prevOff = 255;
     uint16_t khzBFO = 0, tailBFO = 0;
-    uint8_t off = (isSSB() ? -5 : 4) + 8;
     uint8_t i = 0;
     uint8_t len;
 
@@ -451,9 +450,6 @@ void showFrequency(bool cleanDisplay = false)
     }
     else
     {
-        if (g_bandIndex == SW_BAND_TYPE)
-            showBandTag();
-
         if (!isSSB())
         {
             bool swMhz = g_Settings[SettingsIndex::SWUnits].param == 1;
@@ -476,14 +472,15 @@ void showFrequency(bool cleanDisplay = false)
         }
     }
 
+    uint8_t nGlyphs = strlen8(line);
+    uint8_t off = (uint8_t)((128 - (uint16_t)nGlyphs * 14) / 2);
+
     if (cleanDisplay || prevOff != off)
     {
         oledPrint("/////////", 0, UI_PAGE_FREQ, FONT14X24SEVENSEG);
         prevLine[0] = 0;
         prevOff = off;
     }
-    else if (isSSB() && len > prevLen && len == 5)
-        oledPrint("   ", 102, UI_PAGE_FREQ + 1, DEFAULT_FONT);
 
     while (line[i] && line[i] == prevLine[i])
         i++;
@@ -507,7 +504,12 @@ void showFrequency(bool cleanDisplay = false)
     }
 
     if (g_Settings[SettingsIndex::UnitsSwitch].param == 1 && (!isSSB() || isSSB() && len < 5))
-        oledPrint(unit, 102, UI_PAGE_FREQ + 1, DEFAULT_FONT);
+    {
+        uint8_t unitX = off + nGlyphs * 14;
+        if (unitX > 104)
+            unitX = 104;
+        oledPrint(unit, unitX, UI_PAGE_FREQ + 1, DEFAULT_FONT);
+    }
 
     prevLen = len;
 }
@@ -557,11 +559,12 @@ void showStatus(bool cleanFreq)
 {
     showFrequency(cleanFreq);
     showModulation();
-    showStep();
     showBandwidth();
-    showCharge(true);
     showVolume();
     showBfoIdle();
+    oled.setCursor(0, UI_PAGE_SIGNAL);
+    oled.fillLength(0, 128);
+    g_sMeterDrawnVal = 255;
     if (!g_settingsActive)
         showSMeter();
 #if USE_RDS
@@ -572,13 +575,9 @@ void showStatus(bool cleanFreq)
 
 void updateLowerDisplayLine()
 {
-    oledClearLine(UI_PAGE_SECONDARY);
-    showModulation();
-    showStep();
-    showBandwidth();
-    showCharge(true);
-    showBfoIdle();
-    showVolume();
+    g_sMeterDrawnVal = 255;
+    if (!g_settingsActive)
+        showSMeter();
 }
 
 //Converts settings value to UI value
@@ -838,7 +837,8 @@ void menuBack()
     }
     g_settingsActive = false;
     saveAllReceiverInformation();
-    showStatus();
+    oled.clear();
+    showStatus(true);
 }
 
 void switchSettings()
@@ -855,7 +855,7 @@ void switchSettings()
     else
     {
         saveAllReceiverInformation();
-        showStatus();
+        showStatus(true);
     }
 }
 
@@ -919,17 +919,6 @@ void showModulation()
         oled.print(" ");
     if (g_currentMode == FM)
         oledPrint(g_fmStereo ? "ST" : "  ", 88, 0, DEFAULT_FONT);
-
-    showBandTag();
-}
-
-//Draw current band
-void showBandTag()
-{
-    if (g_displayRDS)
-        return;
-
-    oledPrint((g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH)? "CB" : bandTags[g_bandIndex], 0, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_BAND && g_currentMode != FM);
 }
 
 //Draw volume level
@@ -954,76 +943,7 @@ void showVolume()
         return;
     }
 
-    oledPrint(buf, 80, UI_PAGE_SECONDARY2, DEFAULT_FONT, g_currentCmd == CMD_VOLUME);
-}
-
-//Draw battery charge
-//This feature requires hardware mod
-//Voltage divider made of two 10 KOhm resistors between + and GND of Li-Ion battery
-//Solder it to A2 analog pin
-void showCharge(bool forceShow)
-{
-    if (!g_voltagePinConnnected)
-        return;
-
-    // ADC counts at A2 (1/2 Li-Ion via 10k+10k, 3.30 V reference)
-    static const uint16_t dischargeTable[][2] PROGMEM =
-    {
-        { 643, 100 },  //4.15v
-        { 620, 95  },  //4.05v
-        { 604, 90  },  //3.90v
-        { 581, 80  },  //3.75v
-        { 573, 60  },  //3.70v
-        { 558, 40  },  //3.60v
-        { 542, 20  },  //3.50v
-        { 503, 15  },  //3.25v
-        { 496, 5   },  //3.20v
-        { 488, 0   },  //3.15v
-    };
-    const uint8_t rows = sizeof(dischargeTable) / sizeof(dischargeTable[0]);
-
-    static uint32_t lastChargeShow = 0;
-    static int16_t averageSamples = 0;
-
-    int sample = analogRead(BATTERY_VOLTAGE_PIN);
-
-    if ((millis() - lastChargeShow) > 10000 || forceShow)
-    {
-        if (forceShow && averageSamples == 0)
-            averageSamples = sample;
-        uint16_t currentSamples = (uint16_t)averageSamples;
-        uint8_t percents = 0;
-        for (uint8_t i = 0; i < rows; i++)
-        {
-            if (currentSamples >= pgm_read_word(&dischargeTable[i][0]))
-            {
-                percents = (uint8_t)pgm_read_word(&dischargeTable[i][1]);
-                break;
-            }
-        }
-
-        char buf[4];
-        buf[3] = 0;
-        uint8_t il = ilen(percents) < 3 ? 2 : 3;
-        convertToChar(buf, percents, il);
-
-        if (il < 3)
-            buf[2] = '%';
-
-        if (!g_settingsActive && !g_displayRDS && !isSSB())
-        {
-            static uint8_t lastPct = 255;
-            if (forceShow || percents != lastPct)
-            {
-                oledPrint(buf, 102, UI_PAGE_SECONDARY2, DEFAULT_FONT);
-                lastPct = percents;
-            }
-        }
-        lastChargeShow = millis();
-        averageSamples = sample;
-    }
-
-    averageSamples = (averageSamples + sample) / 2;
+    oledPrint(buf, (128 - (8 * 2) + 2 - 6), 0, DEFAULT_FONT, g_currentCmd == CMD_VOLUME);
 }
 
 #if USE_RDS
@@ -1140,14 +1060,8 @@ void showStep()
         }
     }
 
-    uint8_t off = 40;
     if (g_currentCmd == CMD_STEP && g_uiLayer == UI_LAYER_TRANSIENT)
-    {
         paintTransient("STEP", buf);
-        return;
-    }
-    oledPrint("St:", off, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_STEP);
-    oledPrint(buf, off + 24, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_STEP);
 }
 
 void showSMeter()
@@ -1156,7 +1070,7 @@ void showSMeter()
         return;
 
     static uint32_t sMeterUpdated = 0;
-    if (millis() - sMeterUpdated < 100)
+    if (g_sMeterDrawnVal != 255 && millis() - sMeterUpdated < 100)
         return;
     sMeterUpdated = millis();
 
@@ -1190,30 +1104,36 @@ void showSMeter()
         return;
     g_sMeterDrawnVal = val;
 
-    uint8_t digit = 0;
-    if (sUnit)
-    {
-        digit = 2 + (uint8_t)((sUnit - 1) / 2);
-        if (digit > 6)
-            digit = 6;
-    }
+    char lab[4];
+    lab[0] = 'S';
+    lab[1] = (char)('0' + sUnit);
+    lab[2] = plusDb ? '+' : ' ';
+    lab[3] = 0;
+    oledPrint(lab, 0, UI_PAGE_SECONDARY, DEFAULT_FONT);
 
-    // Signal sits under the 7-seg (Sweet Spot: MODE → FREQ → SIGNAL).
-    oled.setCursor(0, UI_PAGE_SIGNAL);
-    oled.startData();
-    oledSendSmGlyph(1);
-    oledSendSmGlyph(digit);
-    oledSendSmGlyph(plusDb ? 7 : 0);
-    oled.sendData(0);
-    oled.sendData(0);
-
-    const uint8_t ramp = 114;
+    const uint8_t x0 = 32;
+    const uint8_t ramp = 96;
     uint8_t filled = (uint8_t)((uint16_t)val * ramp / 15);
+    oled.setCursor(x0, UI_PAGE_SECONDARY);
+    oled.startData();
     for (uint8_t x = 0; x < ramp; x++)
     {
-        uint8_t h = 1 + (uint8_t)((uint16_t)x * 7 / (ramp - 1));
-        uint8_t slope = (h >= 8) ? 0xFF : (uint8_t)(0xFFu << (8 - h));
-        oled.sendData((x < filled) ? slope : 0x80);
+        uint8_t h = 2 + (uint8_t)((uint16_t)x * 14 / (ramp - 1));
+        uint16_t col = 0;
+        if (x < filled)
+            col = (h >= 16) ? 0xFFFF : (uint16_t)(0xFFFFu << (16 - h));
+        oled.sendData((uint8_t)col);
+    }
+    oled.endData();
+    oled.setCursor(x0, UI_PAGE_SECONDARY + 1);
+    oled.startData();
+    for (uint8_t x = 0; x < ramp; x++)
+    {
+        uint8_t h = 2 + (uint8_t)((uint16_t)x * 14 / (ramp - 1));
+        uint16_t col = 0;
+        if (x < filled)
+            col = (h >= 16) ? 0xFFFF : (uint16_t)(0xFFFFu << (16 - h));
+        oled.sendData((uint8_t)(col >> 8));
     }
     oled.endData();
 
@@ -1253,12 +1173,15 @@ void showBandwidth()
         paintTransient("BW", bw);
         return;
     }
-    oledPrint(bw, 96, UI_PAGE_SECONDARY, DEFAULT_FONT, g_currentCmd == CMD_BW);
+    if (isSSB())
+        return;
+    oledPrint(bw, 45, 0, DEFAULT_FONT, g_currentCmd == CMD_BW);
 }
 
 void restoreIdleHeader()
 {
     g_uiLayer = UI_LAYER_NORMAL;
+    g_sMeterDrawnVal = 255;
     oled.setCursor(0, 0);
     oled.fillLength(0, 128);
     oled.setCursor(0, 1);
@@ -1284,7 +1207,7 @@ void showBfoIdle()
         return;
     char buf[7];
     formatBfo(buf);
-    oledPrint(buf, 0, UI_PAGE_SECONDARY2, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
+    oledPrint(buf, 56, 0, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
 }
 
 void paintBfoTransient()
@@ -1392,7 +1315,6 @@ void bandSwitch(bool up)
         g_si4735.setFrequency(nextSW);
         agcSetFunc(); //Re-apply to remove noize
         showFrequency();
-        showBandTag();
     }
     else
     {
@@ -2006,8 +1928,6 @@ void loop()
 
         if (!g_settingsActive)
             showSMeter();
-
-        showCharge(false);
     }
 
     if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT)

@@ -23,25 +23,6 @@ void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* fon
         oled.invertOutput(false);
 }
 
-// 3x5 FT-817 ticks: space, S, 1, 3, 5, 7, 9, +  (column-major, LSB = top)
-const uint8_t kSmeterFont[][3] PROGMEM = {
-    { 0x00, 0x00, 0x00 },
-    { 0x24, 0x2A, 0x12 },
-    { 0x00, 0x22, 0x3F },
-    { 0x22, 0x2A, 0x14 },
-    { 0x20, 0x2E, 0x20 },
-    { 0x21, 0x25, 0x39 },
-    { 0x14, 0x2A, 0x28 },
-    { 0x08, 0x1C, 0x08 }
-};
-
-void oledSendSmGlyph(uint8_t idx)
-{
-    for (uint8_t c = 0; c < 3; c++)
-        oled.sendData(pgm_read_byte(&kSmeterFont[idx][c]));
-    oled.sendData(0);
-}
-
 void oledClearLine(uint8_t y)
 {
     oled.setCursor(0, y);
