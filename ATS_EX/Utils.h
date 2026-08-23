@@ -91,9 +91,7 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0)
     }
 }
 
-// Karat-3.5 5×7 (charMap.h): 0-9, S T E R O M H z +. Secondary / S-meter / STEREO / MHz.
-#define STEREO_PAD 2
-#define STEREO_CHIP_W 39
+// Karat-3.5 5×7: MHz (and leftover glyphs).
 #define MHZ_LABEL_W 17
 
 static const uint8_t kKarat5x7[][5] PROGMEM = {
@@ -118,55 +116,26 @@ static const uint8_t kKarat5x7[][5] PROGMEM = {
     { 0x08, 0x08, 0x3E, 0x08, 0x08 }
 };
 
-void oledPrintStereoChip(uint8_t x0, bool on)
+void oledBlit7segUp2(uint8_t x, const char* s)
 {
-    static const uint8_t kSeq[6] PROGMEM = { 10, 11, 12, 13, 12, 14 };
-
-    if ((uint16_t)x0 + STEREO_CHIP_W > 128)
-        x0 = (uint8_t)(128 - STEREO_CHIP_W);
-    for (uint8_t page = 0; page < 2; page++)
+    for (uint8_t pg = 0; pg < 4; pg++)
     {
-        oled.setCursor(x0, UI_PAGE_FREQ + page);
+        oled.setCursor(x, (uint8_t)(UI_PAGE_FREQ - 1 + pg));
         oled.startData();
-        for (uint8_t x = 0; x < STEREO_CHIP_W; x++)
+        for (uint8_t i = 0; s[i]; i++)
         {
-            if (!on)
+            uint8_t c = (uint8_t)s[i];
+            if (c < 46 || c > 57)
+                c = 47;
+            uint16_t gi = (uint16_t)(c - 46) * 42;
+            for (uint8_t col = 0; col < 14; col++)
             {
-                oled.sendData(0);
-                continue;
+                uint32_t g = pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + col]);
+                g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 14 + col]) << 8;
+                g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 28 + col]) << 16;
+                g <<= 6;
+                oled.sendData((uint8_t)(g >> (8 * pg)));
             }
-            uint8_t d = x;
-            if ((uint8_t)(STEREO_CHIP_W - 1 - x) < d)
-                d = (uint8_t)(STEREO_CHIP_W - 1 - x);
-            uint8_t mask = 0xFF;
-            if (page == 0)
-            {
-                if (d == 0)
-                    mask = 0xFC;
-                else if (d == 1)
-                    mask = 0xFE;
-            }
-            else
-            {
-                mask = 0x07;
-                if (d == 0)
-                    mask = 0x01;
-                else if (d == 1)
-                    mask = 0x03;
-            }
-            uint16_t col = 0x07FF;
-            if (x >= STEREO_PAD && x < STEREO_PAD + 35)
-            {
-                uint8_t lx = (uint8_t)(x - STEREO_PAD);
-                uint8_t c = (uint8_t)(lx % 6);
-                if (c < 5)
-                {
-                    uint8_t letter = pgm_read_byte(&kSeq[lx / 6]);
-                    uint8_t g = pgm_read_byte(&kKarat5x7[letter][c]);
-                    col = (uint16_t)(0x07FF & ~((uint16_t)g << 2));
-                }
-            }
-            oled.sendData((page ? (uint8_t)(col >> 8) : (uint8_t)col) & mask);
         }
         oled.endData();
     }
@@ -177,48 +146,35 @@ void oledPrintMhz(uint8_t x0)
     static const uint8_t kSeq[3] PROGMEM = { 15, 16, 17 };
     if ((uint16_t)x0 + MHZ_LABEL_W > 128)
         x0 = (uint8_t)(128 - MHZ_LABEL_W);
-    oled.setCursor(x0, UI_PAGE_FREQ + 2);
-    oled.startData();
-    for (uint8_t x = 0; x < MHZ_LABEL_W; x++)
+    for (uint8_t pg = 0; pg < 2; pg++)
     {
-        uint8_t b = 0;
-        uint8_t c = (uint8_t)(x % 6);
-        if (c < 5)
+        oled.setCursor(x0, UI_PAGE_FREQ + 1 + pg);
+        oled.startData();
+        for (uint8_t x = 0; x < MHZ_LABEL_W; x++)
         {
-            uint8_t letter = pgm_read_byte(&kSeq[x / 6]);
-            b = pgm_read_byte(&kKarat5x7[letter][c]);
+            uint8_t b = 0;
+            uint8_t c = (uint8_t)(x % 6);
+            if (c < 5)
+            {
+                uint8_t letter = pgm_read_byte(&kSeq[x / 6]);
+                b = pgm_read_byte(&kKarat5x7[letter][c]);
+            }
+            uint16_t col = (uint16_t)b << 6;
+            oled.sendData(pg ? (uint8_t)(col >> 8) : (uint8_t)col);
         }
-        oled.sendData(b);
+        oled.endData();
     }
-    oled.endData();
 }
 
-void oledPrintSMeterLab(const char* text)
+void oledPrintSMeterLab(const char* text, uint8_t barX)
 {
     oled.setCursor(0, UI_PAGE_SECONDARY);
-    oled.fillLength(0, SMETER_BAR_X);
+    oled.fillLength(0, barX);
     oled.setCursor(0, UI_PAGE_SECONDARY + 1);
-    oled.fillLength(0, SMETER_BAR_X);
-    oled.setCursor(2, UI_PAGE_SECONDARY + 1);
-    oled.startData();
-    for (uint8_t i = 0; text[i]; i++)
-    {
-        uint8_t c = (uint8_t)text[i];
-        uint8_t idx = 255;
-        if (c >= '0' && c <= '9')
-            idx = (uint8_t)(c - '0');
-        else if (c == 'S')
-            idx = 10;
-        else if (c == '+')
-            idx = 18;
-        for (uint8_t col = 0; col < 5; col++)
-        {
-            uint8_t g = (idx == 255) ? 0 : pgm_read_byte(&kKarat5x7[idx][col]);
-            oled.sendData((uint8_t)(g << 1));
-        }
-        oled.sendData(0);
-    }
-    oled.endData();
+    oled.fillLength(0, barX);
+    oledSetFont(DEFAULT_FONT);
+    oled.setCursor(0, UI_PAGE_SECONDARY);
+    oled.print(text);
 }
 
 void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)

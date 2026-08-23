@@ -61,11 +61,14 @@
 // IARU S-meter: Si473x RSSI is dBµV. S9 = 50 µV = 34 dBµV, 6 dB per S-unit.
 #define S9_DBUV 34
 #define SMETER_MAX_OVER_S9 60
-#define SMETER_SEGMENTS 16
-#define SMETER_SEG_W 5
-#define SMETER_SEG_GAP 1
-#define SMETER_BAR_X 22
-#define SMETER_RELEASE_MS 400
+#define SMETER_LEVELS 16
+#define SMETER_CUBES 8
+#define SMETER_SEG_W 7
+#define SMETER_SEG_GAP 3
+#define SMETER_DOT_W 10
+#define SMETER_DOT_GAP 7
+#define SMETER_LAB_W 24
+#define SMETER_RELEASE_MS 800
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 1200
 

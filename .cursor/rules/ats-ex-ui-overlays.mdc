@@ -17,8 +17,8 @@ TITLE ............... [VALUE]
 **Font roles**
 
 - **14×24** seven-seg: frequency only (hero). Do not replace with 6×8. Still drawn as 14 px slots; trim widths for `.` / `1` are in `font14x24sevenSeg.h` (`kFreqW`) for a later proportional blit when flash allows.
-- **8×16** Pixel Operator: idle chips, overlay TITLE / focus.
-- **Karat 5×7**: S-meter label, MHz, STEREO, small secondary / RDS / service marks.
+- **8×16** Pixel Operator: idle chips, overlay TITLE / focus, S-meter `S9+` (same 16 px row as the cubes).
+- **Karat 5×7**: MHz, STEREO, small secondary / RDS / service marks. Not the S-meter label — 5×7 cannot fill the 16 px cubes.
 
 - Title: normal 8×16, left.
 - Leader dots between title and chip.
@@ -30,7 +30,7 @@ TITLE ............... [VALUE]
 
 - Mode AM/LSB/USB/CW/WFM: top-left. Two-letter labels centered in the chip (`WFM` is three letters).
 - Filter width: top-center on SW **and** WFM (`AUTO`, `110k`, `3.0k`, CW `0.5k`). Not plain text.
-- WFM stereo: inverted `STEREO` chip, 11 px (5×7 + 2 px fill on all sides), 2 px to the right of the 7-seg. Idle mode chip on FM is `WFM`. `MHz` is 5×7 on the bottom page of the frequency. Not in the header.
+- WFM stereo: 5 px circle after the last S-meter cell (same slot as one extra cube). Outline until a stereo pilot, filled when stereo. Only on the S-meter, only WFM. Not beside the 7-seg. `MHz` is 5×7 on the bottom page of the frequency. Idle mode chip on FM is `WFM`.
 - BAND overlay FM tag is `WFM`, CB is `CB`. No band tag on idle.
 
 Do not add idle VOL, kHz on SW, or idle BFO `+    0`. VOL/BFO only in overlay when adjusting.
