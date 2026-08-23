@@ -1108,10 +1108,14 @@ void showSMeter()
             sUnit = 9;
     }
 
-    // 0..9 = S-units, 10..15 = +10..+60 dB over S9. Label follows current, not peak.
+    // 0..9 = S-units. Any S9+ is at least 10 (last cube); 11..15 = +20..+60 dB for peak hold.
     uint8_t val = sUnit;
     if (plusDb)
+    {
         val = 9 + plusDb / 10;
+        if (val < 10)
+            val = 10;
+    }
     if (val > SMETER_LEVELS - 1)
         val = SMETER_LEVELS - 1;
 
@@ -1170,8 +1174,9 @@ void showSMeter()
     }
     if (val != g_sMeterDrawnVal || smPeak != smDrawnPeak || dotDirty)
     {
-        uint8_t cur = (val >= 9) ? SMETER_CUBES : (uint8_t)((val * SMETER_CUBES + 4) / 9);
-        uint8_t pk = (smPeak >= 9) ? SMETER_CUBES : (uint8_t)((smPeak * SMETER_CUBES + 4) / 9);
+        // First 7 cubes = S1..S9; last cube = any S9+ (label '+'), not extra +10/+40 cells.
+        uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
+        uint8_t pk = (smPeak >= 10) ? SMETER_CUBES : (uint8_t)((smPeak * (SMETER_CUBES - 1) + 4) / 9);
         uint8_t tailX = (uint8_t)(x0 + barW);
         if (g_currentMode == FM)
             tailX = (uint8_t)(tailX + SMETER_DOT_GAP + SMETER_DOT_W);

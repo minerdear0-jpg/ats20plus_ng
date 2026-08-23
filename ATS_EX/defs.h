@@ -72,8 +72,9 @@
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 1200
 
-// Pages: header 0-1, 7-seg (2 px into page 2 + 3-5), S-meter 16 px on 6-7.
+// Pages: header 0-1, 7-seg centered in 2-5 (4 px under header, 4 px above S-meter), S-meter 6-7.
 #define UI_PAGE_FREQ 3
+#define FREQ_SHIFT 4
 #define UI_PAGE_SECONDARY 6
 #define BADGE_PAD 3
 

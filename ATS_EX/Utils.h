@@ -133,7 +133,7 @@ void oledBlit7segUp2(uint8_t x, const char* s)
                 uint32_t g = pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + col]);
                 g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 14 + col]) << 8;
                 g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 28 + col]) << 16;
-                g <<= 6;
+                g <<= FREQ_SHIFT;
                 oled.sendData((uint8_t)(g >> (8 * pg)));
             }
         }
@@ -159,7 +159,7 @@ void oledPrintMhz(uint8_t x0)
                 uint8_t letter = pgm_read_byte(&kSeq[x / 6]);
                 b = pgm_read_byte(&kKarat5x7[letter][c]);
             }
-            uint16_t col = (uint16_t)b << 6;
+            uint16_t col = (uint16_t)b << FREQ_SHIFT;
             oled.sendData(pg ? (uint8_t)(col >> 8) : (uint8_t)col);
         }
         oled.endData();
