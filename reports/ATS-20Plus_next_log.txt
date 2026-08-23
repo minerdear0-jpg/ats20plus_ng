@@ -1,5 +1,9 @@
 ATS-20Plus_next — журнал
 
+Срез 2026-08-24: reports/ATS-20Plus_next_2026-08-24.txt (HEAD add367d, flash 32142).
+Idle UI на железе ок (зазоры, S9/S9+, стерео-пульс, overlay STEP+клик, шапка vs 7-seg).
+Завтра: CLKPR 50% только как решение (millis/I2C vs F_CPU), не разовый слух; g_uiFreqClean; пропорциональный 7-seg; RADIO ERR.
+
 Ветка: ATS-20Plus_next (локально, без push).
 Baseline прошивки: 4fe59be (build.sh). Дальше: один эксперимент = один commit = один avr-size = один hardware test.
 Железо цели: Arduino Uno, ATmega328P, 32256 flash / 2048 SRAM.

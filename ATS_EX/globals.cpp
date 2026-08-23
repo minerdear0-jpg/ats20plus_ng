@@ -19,7 +19,7 @@ uint8_t g_sMeterDrawnVal = 255;
 bool g_displayOn = true;
 bool g_displayRDS = false;
 bool g_rdsSwitchPressed = false;
-bool g_seekStop = false;
+volatile bool g_seekStop = false;
 uint32_t g_lastAdjustmentTime = 0;
 uint32_t g_lastInputMs = 0;
 
@@ -124,8 +124,8 @@ int g_tabStep[] =
 uint8_t g_amTotalSteps = 7;
 uint8_t g_amTotalStepsSSB = 4;
 uint8_t g_ssbTotalSteps = 5;
-volatile int8_t g_stepIndexAM = 3;
-volatile int8_t g_stepIndexSSB = 7;
+int8_t g_stepIndexAM = 3;
+int8_t g_stepIndexSSB = 7;
 
 int8_t g_tabStepFM[] =
 {
@@ -184,7 +184,7 @@ const uint8_t g_SWSubBandCount = sizeof(SWSubBands) / sizeof(uint16_t);
 const uint8_t g_lastBand = (sizeof(g_bandList) / sizeof(Band)) - 1;
 int8_t g_bandIndex = 1;
 
-volatile uint8_t g_currentMode = FM;
+uint8_t g_currentMode = FM;
 const char* g_bandModeDesc[] =
 {
     "AM ",
@@ -193,7 +193,7 @@ const char* g_bandModeDesc[] =
     "CW ",
     "WFM"
 };
-volatile uint8_t g_prevMode = FM;
+uint8_t g_prevMode = FM;
 uint8_t g_seekDirection = 1;
 
 uint32_t g_lastFreqChange = 0;

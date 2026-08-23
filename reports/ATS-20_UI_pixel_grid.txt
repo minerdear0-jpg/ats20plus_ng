@@ -1,32 +1,13 @@
-ATS-20 UI — карта 128×64 (после сдвига FREQ→SIGNAL)
+ATS-20 UI — карта 128×64 (HEAD add367d, 2026-08-24)
 
-OLED: 128×64, 8 страниц × 8 px. UI-шрифт 8×16 = 2 страницы. 7-seg 14×24 = 3 страницы.
+OLED: 128×64, 8 страниц × 8 px.
+Шрифты: 14×24 7-seg частота; 8×16 Pixel Operator чипы/overlay/S9+; Karat 5×7 MHz.
 
-Порядок Sweet Spot: MODE → FREQUENCY → SIGNAL → secondary.
+page 0–1  idle чипы MODE (лево) и BW (центр). Overlay: TITLE …. [badge]
+page 2–5  7-seg, сдвиг FREQ_SHIFT=4: 4 px под шапкой, 4 px над S-метром
+          (страницы 2+3+4+5 = 32 px; глиф 24 px по центру)
+page 6–7  S-meter 16 px: подпись S n[+], 8 кубов 7×12, пик штрихом
+          WFM: 10 px круг после последнего куба (пилот → 2 с lit → heartbeat)
 
-SSB idle (NORMAL)
-page 0-1: MODE (+ Sync S)  BFO            VOL
-page 2-4: 7-seg частота
-page 5:   пусто (зазор под 7-seg)
-page 6-7: S n[+] и 16px ramp. Нет St:, BAND, %
-
-FM idle
-page 0-1: FM  AUTO/BW   ST   VOL
-page 6-7: S-meter 16px
-STEP только transient (кнопка STEP). BAND только overlay.
-
-FM idle (NORMAL)
-page 0-1: FM              ST                  VOL nn   (+ BW если не в transient)
-page 2-4: 7-seg MHz
-page 5:   S n [+] ramp (Karat 5x7)
-page 6-7: RDS PS/RT по умолчанию; MODE снимает RDS и показывает STEP/BAND
-
-FOCUS
-STEP/VOL/BFO: invert в своём слоте; частота и S-метр на месте.
-
-TRANSIENT
-page 0-1: инверт TITLE…………VALUE
-page 2-7: без полной перерисовки
-
-AM
-как SSB без BFO; заряд % справа на page 6 если не SSB.
+Нет на idle: VOL, kHz, BFO, STEREO текстом, band-tag, RDS (USE_RDS 0).
+STEP / VOL / BFO / BAND / MODE / BW — overlay, не вторая «статусная» строка.

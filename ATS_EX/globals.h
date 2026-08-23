@@ -63,7 +63,7 @@ extern uint8_t g_sMeterDrawnVal;
 extern bool g_displayOn;
 extern bool g_displayRDS;
 extern bool g_rdsSwitchPressed;
-extern bool g_seekStop;
+extern volatile bool g_seekStop;
 extern uint32_t g_lastAdjustmentTime;
 extern uint32_t g_lastInputMs;
 
@@ -183,8 +183,8 @@ extern int g_tabStep[];
 extern uint8_t g_amTotalSteps;
 extern uint8_t g_amTotalStepsSSB;
 extern uint8_t g_ssbTotalSteps;
-extern volatile int8_t g_stepIndexAM;
-extern volatile int8_t g_stepIndexSSB;
+extern int8_t g_stepIndexAM;
+extern int8_t g_stepIndexSSB;
 
 extern int8_t g_tabStepFM[];
 extern int8_t g_FMStepIndex;
@@ -238,9 +238,9 @@ enum Modulations : uint8_t
     CW,
     FM
 };
-extern volatile uint8_t g_currentMode;
+extern uint8_t g_currentMode;
 extern const char* g_bandModeDesc[];
-extern volatile uint8_t g_prevMode;
+extern uint8_t g_prevMode;
 extern uint8_t g_seekDirection;
 
 //Special logic for fast and responsive frequency surfing

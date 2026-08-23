@@ -360,7 +360,9 @@ void readAllReceiverInformation()
     g_volume = EEPROM.read(addr++);
     g_bandIndex = EEPROM.read(addr++);
     g_currentMode = EEPROM.read(addr++);
-    g_currentBFO = (EEPROM.read(addr++) << 8) | EEPROM.read(addr++);
+    uint8_t bfoHi = EEPROM.read(addr++);
+    uint8_t bfoLo = EEPROM.read(addr++);
+    g_currentBFO = (bfoHi << 8) | bfoLo;
     g_FMStepIndex = EEPROM.read(addr++);
     g_prevMode = EEPROM.read(addr++);
     g_bwIndexSSB = EEPROM.read(addr++);
@@ -1254,20 +1256,20 @@ void showSMeter()
 //Draw bandwidth (Ignored for CW mode)
 void showBandwidth()
 {
-    char* bw;
+    const char* bw;
     if (isSSB())
     {
-        bw = (char*)g_bandwidthSSB[g_bwIndexSSB].desc;
+        bw = g_bandwidthSSB[g_bwIndexSSB].desc;
         if (g_currentMode == CW)
             bw = "    ";
     }
     else if (g_currentMode == AM)
     {
-        bw = (char*)g_bandwidthAM[g_bwIndexAM].desc;
+        bw = g_bandwidthAM[g_bwIndexAM].desc;
     }
     else
     {
-        bw = (char*)g_bandwidthFM[g_bwIndexFM];
+        bw = g_bandwidthFM[g_bwIndexFM];
     }
 
     if (g_currentCmd == CMD_BW)
@@ -1276,7 +1278,7 @@ void showBandwidth()
         return;
     }
     if (g_currentMode == CW)
-        bw = (char*)g_bandwidthSSB[0].desc;
+        bw = g_bandwidthSSB[0].desc;
     uint8_t w = oledBadgeWidth(bw, BADGE_PAD);
     oledPrintModeBadge(bw, (uint8_t)((128 - w) / 2), BADGE_PAD);
 }
@@ -1468,7 +1470,7 @@ void doStep(int8_t v)
     }
     else
     {
-        volatile int8_t& st = activeStepIndex();
+        int8_t& st = activeStepIndex();
         st = (v > 0) ? st + 1 : st - 1;
         if (st > getLastStep())
             st = 0;
@@ -1633,7 +1635,7 @@ void doCPUSpeed(int8_t v = 0)
     CLKPR = 0x80;
     CLKPR = g_Settings[SettingsIndex::CPUSpeed].param;
     interrupts();
-    // CPU 50% keeps F_CPU=16e6 at compile; millis/TWI/deadlines scale. Needs hardware check (P0.5).
+    // CLKPR /2 does not change F_CPU: millis, delayMicroseconds, TWBR all stay 16 MHz calibrated.
 }
 
 void doDisplayOff(int8_t v)

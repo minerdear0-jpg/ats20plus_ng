@@ -8,7 +8,7 @@ inline bool isSSB()
     return g_currentMode > AM && g_currentMode < FM;
 }
 
-inline volatile int8_t& activeStepIndex()
+inline int8_t& activeStepIndex()
 {
     return isSSB() ? g_stepIndexSSB : g_stepIndexAM;
 }
