@@ -57,13 +57,16 @@ const uint8_t ssd1306xled_font14x24sevenSeg [] PROGMEM =
 	0x00,0x00,0x40,0x60,0x70,0x70,0x70,0x70,0x70,0x70,0x6F,0x5F,0x3F,0x00
 };
 
-const DCfont TinyOLED4kfont14x24sevenSeg = 
+// Frequency blit: not a text font. Trim empty columns (dot and 1 are narrow).
+const uint8_t kFreqCol0[] PROGMEM = { 5, 0, 1, 8, 1, 2, 1, 1, 1, 2, 1, 1 };
+const uint8_t kFreqW[] PROGMEM = { 4, 0, 12, 5, 12, 11, 12, 12, 12, 11, 12, 12 };
+
+const DCfont TinyOLED4kfont14x24sevenSeg =
 {
 	(uint8_t*)ssd1306xled_font14x24sevenSeg,
-	14, //Character width in pixels
-	3, //Character height in pages (8 pixels)
-	46, 57 //ASCII extents
+	14,
+	3,
+	46, 57
 };
 
-//For backwards compatibility
 #define FONT14X24SEVENSEG (&TinyOLED4kfont14x24sevenSeg)

@@ -10,13 +10,14 @@
 #define EEPROM_APP_ID_ADDRESS       0
 
 // Splash / about string. APP_VERSION below is EEPROM layout, not this.
-#define FW_VERSION_STR "2.0b"
+#define FW_VERSION_STR "2.0B"
 
 //EEPROM Settings
 #define STORE_TIME 10000 // Inactive time to save our settings
 
 // OLED Const values
-#define DEFAULT_FONT FONT8X16POB
+// OLED type: 14×24 frequency hero (proportional 7-seg blit). 8×16 transient/focus. Karat 5×7 secondary / S-meter. Not 6×8 for frequency.
+#define DEFAULT_FONT FONT8X16POB_UI
 #define RST_PIN -1
 #define RESET_PIN 12
 
@@ -61,6 +62,10 @@
 #define S9_DBUV 34
 #define SMETER_MAX_OVER_S9 60
 #define SMETER_SEGMENTS 16
+#define SMETER_SEG_W 5
+#define SMETER_SEG_GAP 1
+#define SMETER_BAR_X 22
+#define SMETER_RELEASE_MS 400
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 1200
 

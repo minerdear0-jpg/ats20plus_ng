@@ -12,8 +12,7 @@
 #include <SI4735.h>
 #include <EEPROM.h>
 #include <Tiny4kOLED.h>
-#include <PixelOperatorBold.h> 
-
+#include "font8x16pob_ui.h"
 #include "font14x24sevenSeg.h"
 #include "Rotary.h"
 #include "SimpleButton.h"
@@ -155,9 +154,9 @@ void setup()
     else
     {
         oledPrint(" ATS-20 RECEIVER", 0, 0, DEFAULT_FONT, true);
-        oledPrint("ATS_EX v" FW_VERSION_STR, 16, 2);
+        oledPrint("ATS_EX V" FW_VERSION_STR, 16, 2);
         oledPrint("(C) OOMAN   2026", 0, 4);
-        oledPrint("(C) Cursor  2026", 0, 6);
+        oledPrint("(C) CURSOR  2026", 0, 6);
         delay(2000);
     }
     oled.clear();
@@ -424,16 +423,24 @@ void resetEepromDelay()
 //Draw frequency.
 //BFO and main frequency produce actual frequency that is displayed on LCD
 //I2C: reprint 7-seg from the first glyph that changed ('/' blanks a slot).
+static uint8_t g_mhzX;
+static uint8_t g_freqRightX = 128;
+
 void showFrequency(bool cleanDisplay = false)
 {
     if (g_settingsActive)
         return;
 
+    g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
+
     char unit[4];
-    char line[8];
-    static char prevLine[8];
-    static uint8_t prevLen = 0;
+    char line[10];
+    static char prevLine[10];
     static uint8_t prevOff = 255;
+    static uint8_t prevAuxX = 255;
+    static uint8_t prevAuxMode = 255;
+    static bool prevShowMhz = false;
+    static bool prevStereo = false;
     uint16_t khzBFO = 0, tailBFO = 0;
     uint8_t i = 0;
     uint8_t len;
@@ -455,10 +462,22 @@ void showFrequency(bool cleanDisplay = false)
         if (!isSSB())
         {
             bool swMhz = g_Settings[SettingsIndex::SWUnits].param == 1;
-            convertToChar(line, g_currentFrequency, 5, (g_bandIndex == SW_BAND_TYPE && swMhz) ? 2 : 0, '.', '/');
-            if (g_bandIndex == SW_BAND_TYPE && swMhz)
-                unit[0] = 'M';
-            len = ilen(g_currentFrequency);
+            if (g_bandIndex == SW_BAND_TYPE && !swMhz)
+            {
+                len = ilen(g_currentFrequency);
+                convertToChar(line, g_currentFrequency, len);
+                line[len] = '.';
+                line[len + 1] = '0';
+                line[len + 2] = '0';
+                line[len + 3] = 0;
+            }
+            else
+            {
+                convertToChar(line, g_currentFrequency, 5, (g_bandIndex == SW_BAND_TYPE && swMhz) ? 2 : 0, '.', '/');
+                if (g_bandIndex == SW_BAND_TYPE && swMhz)
+                    unit[0] = 'M';
+                len = ilen(g_currentFrequency);
+            }
         }
         else
         {
@@ -477,7 +496,11 @@ void showFrequency(bool cleanDisplay = false)
     uint8_t nGlyphs = strlen8(line);
     bool showMhz = g_Settings[SettingsIndex::UnitsSwitch].param == 1 && unit[0] == 'M'
         && (!isSSB() || isSSB() && len < 5);
-    uint8_t unitW = showMhz ? 34 : 0;
+    uint8_t unitW = 0;
+    if (g_currentMode == FM)
+        unitW = (uint8_t)(2 + STEREO_CHIP_W);
+    else if (showMhz)
+        unitW = (uint8_t)(2 + MHZ_LABEL_W);
     uint8_t off = (uint8_t)((128 - (uint16_t)nGlyphs * 14 - unitW) / 2);
 
     if (cleanDisplay || prevOff != off)
@@ -508,10 +531,18 @@ void showFrequency(bool cleanDisplay = false)
         } while (line[i++]);
     }
 
-    if (showMhz)
-        oledPrint(unit, off + nGlyphs * 14 + 10, UI_PAGE_FREQ + 1, DEFAULT_FONT);
-
-    prevLen = len;
+    g_freqRightX = (uint8_t)(off + nGlyphs * 14);
+    g_mhzX = (uint8_t)(g_freqRightX + 2);
+    bool layoutDirty = cleanDisplay || prevAuxX != g_mhzX || prevAuxMode != g_currentMode || prevShowMhz != showMhz;
+    if (showMhz && layoutDirty)
+        oledPrintMhz(g_mhzX);
+    if (g_currentMode == FM && (layoutDirty || prevStereo != g_fmStereo))
+        oledPrintStereoChip(g_mhzX, g_fmStereo);
+    prevAuxX = g_mhzX;
+    prevAuxMode = g_currentMode;
+    prevShowMhz = showMhz;
+    prevStereo = g_fmStereo;
+    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }
 
 //This function is called by station seek logic
@@ -602,31 +633,31 @@ void SettingParamToUI(char* buf, uint8_t idx)
             if (param <= 0)
             {
                 buf[0] = 'O';
-                buf[1] = 'f';
-                buf[2] = 'f';
+                buf[1] = 'F';
+                buf[2] = 'F';
             }
             else if (param == 1)
             {
                 buf[0] = '1';
                 buf[1] = '5';
-                buf[2] = 's';
+                buf[2] = 'S';
             }
             else if (param == 2)
             {
                 buf[0] = '3';
                 buf[1] = '0';
-                buf[2] = 's';
+                buf[2] = 'S';
             }
             else if (param == 3)
             {
                 buf[0] = '6';
                 buf[1] = '0';
-                buf[2] = 's';
+                buf[2] = 'S';
             }
             else
             {
                 buf[0] = '2';
-                buf[1] = 'm';
+                buf[1] = 'M';
                 buf[2] = ' ';
             }
             buf[3] = 0;
@@ -654,14 +685,14 @@ void SettingParamToUI(char* buf, uint8_t idx)
         else if (param == 1)
         {
             buf[0] = 'O';
-            buf[1] = 'n';
+            buf[1] = 'N';
             buf[2] = ' ';
         }
         else
         {
             buf[0] = 'O';
-            buf[1] = 'f';
-            buf[2] = 'f';
+            buf[1] = 'F';
+            buf[2] = 'F';
         }
         buf[3] = 0x0;
         break;
@@ -673,23 +704,23 @@ void SettingParamToUI(char* buf, uint8_t idx)
             {
                 buf[0] = '5';
                 buf[1] = '0';
-                buf[2] = 'u';
+                buf[2] = 'U';
             }
             else
             {
                 buf[0] = '7';
                 buf[1] = '5';
-                buf[2] = 'u';
+                buf[2] = 'U';
             }
         }
         else if (idx == SettingsIndex::SWUnits)
         {
             if (param == 0)
-                buf[0] = 'k';
+                buf[0] = 'K';
             else
                 buf[0] = 'M';
             buf[1] = 'H';
-            buf[2] = 'z';
+            buf[2] = 'Z';
         }
         else if (idx == SettingsIndex::SSM)
         {
@@ -736,13 +767,13 @@ void SettingParamToUI(char* buf, uint8_t idx)
             if (param == 0)
             {
                 buf[0] = 'O';
-                buf[1] = 'f';
-                buf[2] = 'f';
+                buf[1] = 'F';
+                buf[2] = 'F';
             }
             else
             {
                 buf[0] = 'O';
-                buf[1] = 'n';
+                buf[1] = 'N';
                 buf[2] = ' ';
             }
         }
@@ -903,8 +934,6 @@ void showModulation()
         oledPrint("S", sx, 0, DEFAULT_FONT, true);
     else
         oledPrint(" ", sx, 0, DEFAULT_FONT);
-    if (g_currentMode == FM)
-        oledPrint(g_fmStereo ? "ST" : "  ", 88, 0, DEFAULT_FONT);
 }
 
 //Draw volume level
@@ -1018,7 +1047,7 @@ void showStep()
         else
         {
             convertToChar(buf, g_tabStepFM[g_FMStepIndex] * 10, 3);
-            buf[3] = 'k';
+            buf[3] = 'K';
             buf[4] = '\0';
         }
     }
@@ -1037,7 +1066,7 @@ void showStep()
         else
         {
             convertToChar(buf, g_tabStep[activeStepIndex()], 3);
-            buf[3] = 'k';
+            buf[3] = 'K';
             buf[4] = '\0';
         }
     }
@@ -1053,9 +1082,13 @@ void showSMeter()
         return;
 
     static uint32_t sMeterUpdated = 0;
-    if (g_sMeterDrawnVal != 255 && millis() - sMeterUpdated < 100)
+    static uint8_t smPeak = 0;
+    static uint8_t smDrawnPeak = 255;
+    static uint32_t smPeakMs = 0;
+    uint32_t now = millis();
+    if (g_sMeterDrawnVal != 255 && now - sMeterUpdated < 100)
         return;
-    sMeterUpdated = millis();
+    sMeterUpdated = now;
 
     g_si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = g_si4735.getCurrentRSSI();
@@ -1076,60 +1109,80 @@ void showSMeter()
             sUnit = 9;
     }
 
-    // 0..9 = S-units, 10..15 = +10..+60 dB over S9
+    // 0..9 = S-units, 10..15 = +10..+60 dB over S9. Label follows current, not peak.
     uint8_t val = sUnit;
     if (plusDb)
         val = 9 + plusDb / 10;
-    if (val > 15)
-        val = 15;
+    if (val > SMETER_SEGMENTS - 1)
+        val = SMETER_SEGMENTS - 1;
 
-    if (val == g_sMeterDrawnVal)
-        return;
-    g_sMeterDrawnVal = val;
-
-    char lab[4];
-    lab[0] = 'S';
-    lab[1] = (char)('0' + sUnit);
-    lab[2] = plusDb ? '+' : ' ';
-    lab[3] = 0;
-    oledPrint(lab, 0, UI_PAGE_SECONDARY, DEFAULT_FONT);
-
-    const uint8_t x0 = 32;
-    const uint8_t ramp = 96;
-    uint8_t filled = (uint8_t)((uint16_t)val * ramp / 15);
-    oled.setCursor(x0, UI_PAGE_SECONDARY);
-    oled.startData();
-    for (uint8_t x = 0; x < ramp; x++)
+    if (g_sMeterDrawnVal == 255)
     {
-        uint8_t h = 2 + (uint8_t)((uint16_t)x * 14 / (ramp - 1));
-        uint16_t col = 0;
-        if (x < filled)
-            col = (h >= 16) ? 0xFFFF : (uint16_t)(0xFFFFu << (16 - h));
-        oled.sendData((uint8_t)col);
+        smPeak = val;
+        smDrawnPeak = 255;
+        smPeakMs = now;
     }
-    oled.endData();
-    oled.setCursor(x0, UI_PAGE_SECONDARY + 1);
-    oled.startData();
-    for (uint8_t x = 0; x < ramp; x++)
+    else if (val > smPeak)
     {
-        uint8_t h = 2 + (uint8_t)((uint16_t)x * 14 / (ramp - 1));
-        uint16_t col = 0;
-        if (x < filled)
-            col = (h >= 16) ? 0xFFFF : (uint16_t)(0xFFFFu << (16 - h));
-        oled.sendData((uint8_t)(col >> 8));
+        smPeak = val;
+        smPeakMs = now;
     }
-    oled.endData();
+    else if (val < smPeak && now - smPeakMs >= SMETER_RELEASE_MS)
+    {
+        smPeak--;
+        smPeakMs = now;
+    }
 
+    bool stereoDirty = false;
     if (g_currentMode == FM)
     {
         bool st = g_si4735.getCurrentPilot();
         if (st != g_fmStereo)
         {
             g_fmStereo = st;
-            if (g_uiLayer == UI_LAYER_NORMAL)
-                oledPrint(g_fmStereo ? "ST" : "  ", 88, 0, DEFAULT_FONT);
+            stereoDirty = true;
         }
     }
+    if (val == g_sMeterDrawnVal && smPeak == smDrawnPeak && !stereoDirty)
+        return;
+
+    g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
+    if (val != g_sMeterDrawnVal)
+    {
+        char lab[4];
+        lab[0] = 'S';
+        lab[1] = (char)('0' + sUnit);
+        lab[2] = plusDb ? '+' : ' ';
+        lab[3] = 0;
+        oledPrintSMeterLab(lab);
+    }
+    if (val != g_sMeterDrawnVal || smPeak != smDrawnPeak)
+    {
+        oled.setCursor(SMETER_BAR_X, UI_PAGE_SECONDARY);
+        oled.fillLength(0, (uint8_t)(128 - SMETER_BAR_X));
+        oled.setCursor(SMETER_BAR_X, UI_PAGE_SECONDARY + 1);
+        oled.startData();
+        for (uint8_t i = 0; i < SMETER_SEGMENTS; i++)
+        {
+            uint8_t pat = 0;
+            if (i < val)
+                pat = 0xFE;
+            else if (i < smPeak)
+                pat = 0x54;
+            for (uint8_t w = 0; w < SMETER_SEG_W; w++)
+                oled.sendData(pat);
+            if (i != SMETER_SEGMENTS - 1)
+                oled.sendData(0);
+        }
+        oled.endData();
+        oled.setCursor((uint8_t)(SMETER_BAR_X + SMETER_SEGMENTS * SMETER_SEG_W + (SMETER_SEGMENTS - 1)), UI_PAGE_SECONDARY + 1);
+        oled.fillLength(0, (uint8_t)(128 - SMETER_BAR_X - (SMETER_SEGMENTS * SMETER_SEG_W + (SMETER_SEGMENTS - 1))));
+        g_sMeterDrawnVal = val;
+        smDrawnPeak = smPeak;
+    }
+    if (stereoDirty)
+        oledPrintStereoChip(g_mhzX, g_fmStereo);
+    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }
 
 //Draw bandwidth (Ignored for CW mode)
@@ -1887,14 +1940,13 @@ void loop()
     servicePendingTune();
     uiFlush();
 
+    if (!g_radioError && !g_settingsActive)
+        showSMeter();
     if (!g_radioError && millis() - g_lastFreqChange >= BACKGROUND_UI_MS)
     {
 #if USE_RDS
         showRDS();
 #endif
-
-        if (!g_settingsActive)
-            showSMeter();
     }
 
     if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT

@@ -47,10 +47,10 @@ SettingsItem g_Settings[] =
     { "ATT", 0,  SettingType::ZeroAuto,     doAttenuation     },
     { "SM ", 0,  SettingType::Num,          doSoftMute        },
     { "SVC", 1,  SettingType::Switch,       doSSBAVC          },
-    { "Syn", 0,  SettingType::Switch,       doSync            },
-    { "DeE", 1,  SettingType::Switch,       doDeEmp           },
+    { "SYN", 0,  SettingType::Switch,       doSync            },
+    { "DEE", 1,  SettingType::Switch,       doDeEmp           },
     { "AVC", 46, SettingType::Num,          doAvc             },
-    { "Scr", 80, SettingType::Num,          doBrightness      },
+    { "SCR", 80, SettingType::Num,          doBrightness      },
     { "SW ", 0,  SettingType::Switch,       doSWUnits         },
     { "SSM", 1,  SettingType::Switch,       doSSBSoftMuteMode },
     { "COF", 0,  SettingType::SwitchAuto,   doCutoffFilter    },
@@ -60,8 +60,8 @@ SettingsItem g_Settings[] =
 #endif
     { "DIS", 0,  SettingType::Num,          doDisplayOff      },
     { "BFO", 0,  SettingType::Num,          doBFOCalibration  },
-    { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },
-    { "Sca", 1,  SettingType::Switch,       doScanSwitch      },
+    { "UNI", 1,  SettingType::Switch,       doUnitsSwitch     },
+    { "SCA", 1,  SettingType::Switch,       doScanSwitch      },
     { "CW ", 0,  SettingType::Switch,       doCWSwitch        },
     { "CWP", 7,  SettingType::Num,          doCWPitch         },
     { "ANB", 0,  SettingType::Switch,       doANB             },
@@ -76,34 +76,34 @@ bool g_SettingEditing = false;
 int8_t g_bwIndexSSB = 4;
 Bandwidth g_bandwidthSSB[] =
 {
-    { 4, "0.5k" },
-    { 5, "1.0k" },
-    { 0, "1.2k" },
-    { 1, "2.2k" },
-    { 2, "3.0k" },
-    { 3, "4.0k" }
+    { 4, "0.5K" },
+    { 5, "1.0K" },
+    { 0, "1.2K" },
+    { 1, "2.2K" },
+    { 2, "3.0K" },
+    { 3, "4.0K" }
 };
 
 int8_t g_bwIndexAM = 4;
 Bandwidth g_bandwidthAM[] =
 {
-    { 4, "1.0k" },
-    { 5, "1.8k" },
-    { 3, "2.0k" },
-    { 6, "2.5k" },
-    { 2, "3.0k" },
-    { 1, "4.0k" },
-    { 0, "6.0k" }
+    { 4, "1.0K" },
+    { 5, "1.8K" },
+    { 3, "2.0K" },
+    { 6, "2.5K" },
+    { 2, "3.0K" },
+    { 1, "4.0K" },
+    { 0, "6.0K" }
 };
 
 int8_t g_bwIndexFM = 0;
 char* g_bandwidthFM[] =
 {
     "AUTO",
-    "110k",
-    " 84k",
-    " 60k",
-    " 40k"
+    "110K",
+    " 84K",
+    " 60K",
+    " 40K"
 };
 
 int g_tabStep[] =
@@ -191,7 +191,7 @@ const char* g_bandModeDesc[] =
     "LSB",
     "USB",
     "CW ",
-    "FM "
+    "WFM"
 };
 volatile uint8_t g_prevMode = FM;
 uint8_t g_seekDirection = 1;

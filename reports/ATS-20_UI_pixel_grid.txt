@@ -5,15 +5,20 @@ OLED: 128×64, 8 страниц × 8 px. UI-шрифт 8×16 = 2 страниц�
 Порядок Sweet Spot: MODE → FREQUENCY → SIGNAL → secondary.
 
 SSB idle (NORMAL)
-page 0-1: MODE (+ Sync S)                         VOL nn
-page 2-4: 7-seg частота (герой)
-page 5:   S-meter (S / digit / + / ramp)
-page 6-7: BAND   St:xxxx                    ±BFO
+page 0-1: MODE (+ Sync S)  BFO            VOL
+page 2-4: 7-seg частота
+page 5:   пусто (зазор под 7-seg)
+page 6-7: S n[+] и 16px ramp. Нет St:, BAND, %
+
+FM idle
+page 0-1: FM  AUTO/BW   ST   VOL
+page 6-7: S-meter 16px
+STEP только transient (кнопка STEP). BAND только overlay.
 
 FM idle (NORMAL)
 page 0-1: FM              ST                  VOL nn   (+ BW если не в transient)
 page 2-4: 7-seg MHz
-page 5:   S-meter
+page 5:   S n [+] ramp (Karat 5x7)
 page 6-7: RDS PS/RT по умолчанию; MODE снимает RDS и показывает STEP/BAND
 
 FOCUS

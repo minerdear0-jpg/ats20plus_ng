@@ -14,6 +14,12 @@ Do not use a full-width inverted header for menus or transients.
 TITLE ............... [VALUE]
 ```
 
+**Font roles**
+
+- **14×24** seven-seg: frequency only (hero). Do not replace with 6×8. Still drawn as 14 px slots; trim widths for `.` / `1` are in `font14x24sevenSeg.h` (`kFreqW`) for a later proportional blit when flash allows.
+- **8×16** Pixel Operator: idle chips, overlay TITLE / focus.
+- **Karat 5×7**: S-meter label, MHz, STEREO, small secondary / RDS / service marks.
+
 - Title: normal 8×16, left.
 - Leader dots between title and chip.
 - Value: rounded inverted chip (`oledPrintModeBadge`, `paintTransient`).
@@ -22,8 +28,9 @@ TITLE ............... [VALUE]
 
 **Idle chips** (black on filled rounded rect):
 
-- Mode AM/LSB/USB/CW/FM: top-left. Two-letter labels centered in the chip.
+- Mode AM/LSB/USB/CW/WFM: top-left. Two-letter labels centered in the chip (`WFM` is three letters).
 - Filter width: top-center on SW **and** WFM (`AUTO`, `110k`, `3.0k`, CW `0.5k`). Not plain text.
+- WFM stereo: inverted `STEREO` chip, 11 px (5×7 + 2 px fill on all sides), 2 px to the right of the 7-seg. Idle mode chip on FM is `WFM`. `MHz` is 5×7 on the bottom page of the frequency. Not in the header.
 - BAND overlay FM tag is `WFM`, CB is `CB`. No band tag on idle.
 
 Do not add idle VOL, kHz on SW, or idle BFO `+    0`. VOL/BFO only in overlay when adjusting.
