@@ -11,6 +11,86 @@ void oledSetFont(const DCfont* font)
     }
 }
 
+// Inverted rounded chip, 16 px tall. vis≤3 → 24 px (2-letter labels centered).
+uint8_t oledBadgeVis(const char* text)
+{
+    uint8_t a = 0;
+    while (text[a] == ' ')
+        a++;
+    uint8_t b = a;
+    while (text[b])
+        b++;
+    while (b > a && text[b - 1] == ' ')
+        b--;
+    return (uint8_t)(b - a);
+}
+
+uint8_t oledBadgeWidth(const char* text, uint8_t sidePad = 0)
+{
+    uint8_t vis = oledBadgeVis(text);
+    if (vis > 6)
+        vis = 6;
+    return (uint8_t)(vis * 8 + 2 * sidePad);
+}
+
+void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0)
+{
+    const DCfont* f = DEFAULT_FONT;
+    uint8_t skip = 0;
+    while (text[skip] == ' ')
+        skip++;
+    uint8_t vis = oledBadgeVis(text);
+    if (vis > 6)
+        vis = 6;
+    uint8_t boxW = oledBadgeWidth(text, sidePad);
+    uint8_t pad = (vis * 8 < boxW) ? (uint8_t)((boxW - vis * 8) / 2) : 0;
+
+    for (uint8_t page = 0; page < 2; page++)
+    {
+        oled.setCursor(x0, page);
+        oled.startData();
+        for (uint8_t x = 0; x < boxW; x++)
+        {
+            uint8_t d = x;
+            if ((uint8_t)(boxW - 1 - x) < d)
+                d = (uint8_t)(boxW - 1 - x);
+            uint8_t mask = 0xFF;
+            if (page == 0)
+            {
+                if (d == 0)
+                    mask = 0xF8;
+                else if (d == 1)
+                    mask = 0xFC;
+                else if (d == 2)
+                    mask = 0xFE;
+            }
+            else
+            {
+                if (d == 0)
+                    mask = 0x1F;
+                else if (d == 1)
+                    mask = 0x3F;
+                else if (d == 2)
+                    mask = 0x7F;
+            }
+
+            uint8_t b = 0xFF;
+            if (x >= pad && x < pad + vis * 8)
+            {
+                uint8_t ci = (uint8_t)((x - pad) / 8);
+                uint8_t col = (uint8_t)((x - pad) % 8);
+                uint8_t c = (uint8_t)text[skip + ci];
+                if (c < f->first || c > f->last)
+                    c = ' ';
+                uint16_t off = (uint16_t)(c - f->first) * 16 + (uint16_t)page * 8;
+                b = (uint8_t)~pgm_read_byte(&f->bitmap[off + col]);
+            }
+            oled.sendData(b & mask);
+        }
+        oled.endData();
+    }
+}
+
 void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)
 {
     oledSetFont(font);

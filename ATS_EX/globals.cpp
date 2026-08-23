@@ -147,7 +147,7 @@ char* bandTags[] =
     "LW",
     "MW",
     "SW",
-    "  ",
+    "WFM",
 };
 
 Band g_bandList[] =

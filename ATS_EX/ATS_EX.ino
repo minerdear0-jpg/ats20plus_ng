@@ -27,10 +27,10 @@ void showStatus(bool cleanFreq = false);
 void uiFlush();
 void paintTransient(const char* title, const char* value);
 void restoreIdleHeader();
-void showBfoIdle();
 void showRadioError();
 void switchCommand(uint8_t cmd = CMD_NONE, void (*showFunction)() = 0);
-void stepMode(int8_t dir);
+void cycleModePick(int8_t dir);
+void commitModePick();
 void paintModeOrBand();
 
 int getLastStep()
@@ -49,6 +49,8 @@ int getLastStep()
 // --------------------------
 
 #define APP_VERSION 123
+
+static uint8_t g_modePick = AM;
 
 //Initialize controller
 // Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
@@ -473,7 +475,10 @@ void showFrequency(bool cleanDisplay = false)
     }
 
     uint8_t nGlyphs = strlen8(line);
-    uint8_t off = (uint8_t)((128 - (uint16_t)nGlyphs * 14) / 2);
+    bool showMhz = g_Settings[SettingsIndex::UnitsSwitch].param == 1 && unit[0] == 'M'
+        && (!isSSB() || isSSB() && len < 5);
+    uint8_t unitW = showMhz ? 34 : 0;
+    uint8_t off = (uint8_t)((128 - (uint16_t)nGlyphs * 14 - unitW) / 2);
 
     if (cleanDisplay || prevOff != off)
     {
@@ -503,13 +508,8 @@ void showFrequency(bool cleanDisplay = false)
         } while (line[i++]);
     }
 
-    if (g_Settings[SettingsIndex::UnitsSwitch].param == 1 && (!isSSB() || isSSB() && len < 5))
-    {
-        uint8_t unitX = off + nGlyphs * 14;
-        if (unitX > 104)
-            unitX = 104;
-        oledPrint(unit, unitX, UI_PAGE_FREQ + 1, DEFAULT_FONT);
-    }
+    if (showMhz)
+        oledPrint(unit, off + nGlyphs * 14 + 10, UI_PAGE_FREQ + 1, DEFAULT_FONT);
 
     prevLen = len;
 }
@@ -557,11 +557,8 @@ void doSeek()
 //cleanFreq   - force clean frequency line
 void showStatus(bool cleanFreq)
 {
+    restoreIdleHeader();
     showFrequency(cleanFreq);
-    showModulation();
-    showBandwidth();
-    showVolume();
-    showBfoIdle();
     oled.setCursor(0, UI_PAGE_SIGNAL);
     oled.fillLength(0, 128);
     g_sMeterDrawnVal = 255;
@@ -862,37 +859,26 @@ void switchSettings()
 //Draw curremt modulation
 void paintTransient(const char* title, const char* value)
 {
-    char line[17];
-    uint8_t i = 0;
-    while (title[i] && i < 6)
-    {
-        line[i] = title[i];
-        i++;
-    }
-    line[i++] = ' ';
-    uint8_t vl = 0;
-    while (value[vl] == ' ')
-        vl++;
-    const char* v = &value[vl];
-    vl = 0;
-    while (v[vl])
-        vl++;
-    uint8_t start = (vl < 16) ? (uint8_t)(16 - vl) : i;
-    if (start < i)
-        start = i;
-    while (i < start)
-        line[i++] = ' ';
-    uint8_t j = 0;
-    while (j < vl && i < 16)
-        line[i++] = v[j++];
-    while (i < 16)
-        line[i++] = ' ';
-    line[16] = 0;
-    oledSetFont(DEFAULT_FONT);
-    oled.invertOutput(true);
     oled.setCursor(0, 0);
-    oled.print(line);
-    oled.invertOutput(false);
+    oled.fillLength(0, 128);
+    oled.setCursor(0, 1);
+    oled.fillLength(0, 128);
+
+    oledPrint(title, 0, 0, DEFAULT_FONT);
+    uint8_t tw = 0;
+    while (title[tw])
+        tw++;
+    uint8_t badgeW = oledBadgeWidth(value, BADGE_PAD);
+    uint8_t badgeX = (uint8_t)(128 - badgeW);
+    oledSetFont(DEFAULT_FONT);
+    oled.setCursor(tw * 8, 0);
+    uint8_t x = tw * 8;
+    while (x + 8 <= badgeX)
+    {
+        oled.print(".");
+        x += 8;
+    }
+    oledPrintModeBadge(value, badgeX, BADGE_PAD);
     g_uiLayer = UI_LAYER_TRANSIENT;
 }
 
@@ -904,19 +890,19 @@ void showRadioError()
 void paintModeOrBand()
 {
     if (g_currentCmd == CMD_MODE)
-        paintTransient("MODE", g_bandModeDesc[g_currentMode]);
+        paintTransient("MODE", g_bandModeDesc[g_modePick]);
     else if (g_currentCmd == CMD_BAND)
         paintTransient("BAND", (g_currentFrequency >= CB_LIMIT_LOW && g_currentFrequency < CB_LIMIT_HIGH) ? "CB" : bandTags[g_bandIndex]);
 }
 
 void showModulation()
 {
-    oledPrint(g_bandModeDesc[g_currentMode], 0, 0, DEFAULT_FONT, g_currentCmd == CMD_BAND && g_currentMode == FM);
-    oled.print(" ");
+    oledPrintModeBadge(g_bandModeDesc[g_currentMode], 0, BADGE_PAD);
+    uint8_t sx = (uint8_t)(oledBadgeWidth(g_bandModeDesc[g_currentMode], BADGE_PAD) + 2);
     if (isSSB() && g_Settings[SettingsIndex::Sync].param == 1)
-        oledPrint("S", -1, -1, LastFont, true);
+        oledPrint("S", sx, 0, DEFAULT_FONT, true);
     else
-        oled.print(" ");
+        oledPrint(" ", sx, 0, DEFAULT_FONT);
     if (g_currentMode == FM)
         oledPrint(g_fmStereo ? "ST" : "  ", 88, 0, DEFAULT_FONT);
 }
@@ -937,13 +923,9 @@ void showVolume()
         buf[2] = 0;
     }
 
-    if (g_currentCmd == CMD_VOLUME && g_uiLayer == UI_LAYER_TRANSIENT)
-    {
-        paintTransient("VOL", buf);
+    if (g_currentCmd != CMD_VOLUME)
         return;
-    }
-
-    oledPrint(buf, (128 - (8 * 2) + 2 - 6), 0, DEFAULT_FONT, g_currentCmd == CMD_VOLUME);
+    paintTransient("VOL", buf);
 }
 
 #if USE_RDS
@@ -1060,8 +1042,9 @@ void showStep()
         }
     }
 
-    if (g_currentCmd == CMD_STEP && g_uiLayer == UI_LAYER_TRANSIENT)
-        paintTransient("STEP", buf);
+    if (g_currentCmd != CMD_STEP)
+        return;
+    paintTransient("STEP", buf);
 }
 
 void showSMeter()
@@ -1168,14 +1151,15 @@ void showBandwidth()
         bw = (char*)g_bandwidthFM[g_bwIndexFM];
     }
 
-    if (g_currentCmd == CMD_BW && g_uiLayer == UI_LAYER_TRANSIENT)
+    if (g_currentCmd == CMD_BW)
     {
         paintTransient("BW", bw);
         return;
     }
-    if (isSSB())
-        return;
-    oledPrint(bw, 45, 0, DEFAULT_FONT, g_currentCmd == CMD_BW);
+    if (g_currentMode == CW)
+        bw = (char*)g_bandwidthSSB[0].desc;
+    uint8_t w = oledBadgeWidth(bw, BADGE_PAD);
+    oledPrintModeBadge(bw, (uint8_t)((128 - w) / 2), BADGE_PAD);
 }
 
 void restoreIdleHeader()
@@ -1199,15 +1183,6 @@ void formatBfo(char* buf)
         b = -b;
     convertToChar(&buf[1], (uint16_t)b, 5);
     buf[6] = 0;
-}
-
-void showBfoIdle()
-{
-    if (!isSSB() || g_settingsActive || g_displayRDS)
-        return;
-    char buf[7];
-    formatBfo(buf);
-    oledPrint(buf, 56, 0, DEFAULT_FONT, g_uiFocus == FOCUS_BFO);
 }
 
 void paintBfoTransient()
@@ -1234,7 +1209,6 @@ void cycleEncoderFocus()
     if (next == FOCUS_FREQ)
     {
         g_lastAdjustmentTime = 0;
-        showBfoIdle();
         return;
     }
 
@@ -1252,10 +1226,7 @@ void cycleEncoderFocus()
         showVolume();
     }
     else
-    {
-        g_uiLayer = UI_LAYER_FOCUS;
-        showBfoIdle();
-    }
+        paintBfoTransient();
 }
 
 void uiFlush()
@@ -1678,7 +1649,6 @@ void switchCommand(uint8_t cmd, void (*showFunction)())
         restoreIdleHeader();
         showStep();
         showVolume();
-        showBfoIdle();
         return;
     }
 
@@ -1739,66 +1709,63 @@ void displaySleepIfDue()
     oled.off();
 }
 
-void stepMode(int8_t dir)
+void cycleModePick(int8_t dir)
 {
     if (g_currentMode == FM || dir == 0)
+        return;
+    uint8_t m = g_modePick;
+    if (dir > 0)
+    {
+        if (m == AM)
+            m = LSB;
+        else if (m == LSB)
+            m = USB;
+        else if (m == USB)
+            m = CW;
+        else
+            m = AM;
+    }
+    else
+    {
+        if (m == AM)
+            m = CW;
+        else if (m == LSB)
+            m = AM;
+        else if (m == USB)
+            m = LSB;
+        else
+            m = USB;
+    }
+    g_modePick = m;
+}
+
+void commitModePick()
+{
+    if (g_modePick == g_currentMode || g_currentMode == FM)
         return;
 
     g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
     g_prevMode = g_currentMode;
 
-    if (dir > 0)
+    bool fromSsb = isSSB();
+    bool toSsb = (g_modePick == LSB || g_modePick == USB || g_modePick == CW);
+
+    if (fromSsb)
     {
-        switch (g_currentMode)
-        {
-        case AM:
-            loadSSBPatch();
-            g_processFreqChange = false;
-            g_currentMode = LSB;
-            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-            break;
-        case LSB:
-            g_currentMode = USB;
-            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-            break;
-        case USB:
-            g_currentMode = CW;
-            if (g_currentCmd == CMD_BW)
-                g_currentCmd = CMD_NONE;
-            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-            break;
-        case CW:
-            g_currentMode = AM;
-            g_ssbLoaded = false;
+        g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
+        if (!toSsb)
             g_currentFrequency += (g_currentBFO / 1000);
-            break;
-        }
-    }
-    else
-    {
-        switch (g_currentMode)
-        {
-        case AM:
-            loadSSBPatch();
-            g_processFreqChange = false;
-            g_currentMode = CW;
-            break;
-        case LSB:
-            g_currentMode = AM;
-            g_ssbLoaded = false;
-            g_currentFrequency += (g_currentBFO / 1000);
-            break;
-        case USB:
-            g_currentMode = LSB;
-            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-            break;
-        case CW:
-            g_currentMode = USB;
-            g_bandList[g_bandIndex].currentFreq += g_currentBFO / 1000;
-            break;
-        }
     }
 
+    if (toSsb && !g_ssbLoaded)
+    {
+        loadSSBPatch();
+        g_processFreqChange = false;
+    }
+    if (!toSsb)
+        g_ssbLoaded = false;
+
+    g_currentMode = g_modePick;
     g_bandList[g_bandIndex].currentStepIdx = g_stepIndexAM;
     applyBandConfiguration();
 }
@@ -1879,7 +1846,7 @@ void loop()
         }
         else if (g_currentCmd == CMD_MODE)
         {
-            stepMode(g_encoderCount);
+            cycleModePick(g_encoderCount);
             paintModeOrBand();
         }
         else if (g_uiFocus == FOCUS_BFO && isSSB())
@@ -1930,7 +1897,8 @@ void loop()
             showSMeter();
     }
 
-    if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT)
+    if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT
+        && g_currentCmd != CMD_STEP && g_currentCmd != CMD_MODE)
         switchCommand();
 
     //Command-checkers
@@ -2007,7 +1975,11 @@ void loop()
             showStatus();
         }
         else if (g_uiLayer == UI_LAYER_TRANSIENT)
+        {
+            if (g_currentCmd == CMD_MODE)
+                commitModePick();
             switchCommand();
+        }
         else
             cycleEncoderFocus();
     }
@@ -2086,8 +2058,8 @@ void loop()
                 switchCommand();
             else
             {
+                g_modePick = g_currentMode;
                 g_currentCmd = CMD_MODE;
-                g_lastAdjustmentTime = millis();
                 paintModeOrBand();
             }
         }

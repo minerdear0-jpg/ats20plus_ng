@@ -68,6 +68,7 @@
 #define UI_PAGE_FREQ 3
 #define UI_PAGE_SIGNAL 2
 #define UI_PAGE_SECONDARY 6
+#define BADGE_PAD 3
 
 // Band settings
 #define SW_LIMIT_LOW		1710

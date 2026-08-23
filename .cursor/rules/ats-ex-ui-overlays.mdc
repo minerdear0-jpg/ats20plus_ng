@@ -1,0 +1,31 @@
+---
+description: ATS_EX idle and overlay UI — title + dots + rounded inverted badge
+globs: ATS_EX/**/*.{ino,h,cpp}
+alwaysApply: true
+---
+
+# Overlay and chip UI
+
+Do not use a full-width inverted header for menus or transients.
+
+**Selection overlay** (MODE, BAND, STEP, VOL, BW, BFO): one 16 px row.
+
+```
+TITLE ............... [VALUE]
+```
+
+- Title: normal 8×16, left.
+- Leader dots between title and chip.
+- Value: rounded inverted chip (`oledPrintModeBadge`, `paintTransient`).
+- Chip fill is **+3 px** after the last glyph and **+3 px** before the first (`BADGE_PAD`). Same for idle chips.
+- Encoder changes the chip; confirm with encoder click where the radio would otherwise blink (MODE). STEP also waits for confirm (no timeout).
+
+**Idle chips** (black on filled rounded rect):
+
+- Mode AM/LSB/USB/CW/FM: top-left. Two-letter labels centered in the chip.
+- Filter width: top-center on SW **and** WFM (`AUTO`, `110k`, `3.0k`, CW `0.5k`). Not plain text.
+- BAND overlay FM tag is `WFM`, CB is `CB`. No band tag on idle.
+
+Do not add idle VOL, kHz on SW, or idle BFO `+    0`. VOL/BFO only in overlay when adjusting.
+
+New settings and transients must use this pattern, not a new menu chrome.
