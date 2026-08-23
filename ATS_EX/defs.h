@@ -72,9 +72,8 @@
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 1200
 
-// Sweet Spot pages: header 0-1, unused 2, 7-seg 3-5, S-meter 16px on 6-7.
+// Pages: header 0-1, 7-seg (2 px into page 2 + 3-5), S-meter 16 px on 6-7.
 #define UI_PAGE_FREQ 3
-#define UI_PAGE_SIGNAL 2
 #define UI_PAGE_SECONDARY 6
 #define BADGE_PAD 3
 

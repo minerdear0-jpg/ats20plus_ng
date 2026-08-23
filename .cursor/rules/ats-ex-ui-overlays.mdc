@@ -30,7 +30,7 @@ TITLE ............... [VALUE]
 
 - Mode AM/LSB/USB/CW/WFM: top-left. Two-letter labels centered in the chip (`WFM` is three letters).
 - Filter width: top-center on SW **and** WFM (`AUTO`, `110k`, `3.0k`, CW `0.5k`). Not plain text.
-- WFM stereo: 5 px circle after the last S-meter cell (same slot as one extra cube). Outline until a stereo pilot, filled when stereo. Only on the S-meter, only WFM. Not beside the 7-seg. `MHz` is 5×7 on the bottom page of the frequency. Idle mode chip on FM is `WFM`.
+- WFM stereo: hidden until a stereo pilot. Then a filled 10 px circle after the last S-meter cell; after 2 s of stable stereo it heartbeats (1 s on / 1 s off, 2 s period). Only on the S-meter, only WFM. Not beside the 7-seg. `MHz` is 5×7 on the bottom page of the frequency. Idle mode chip on FM is `WFM`.
 - BAND overlay FM tag is `WFM`, CB is `CB`. No band tag on idle.
 
 Do not add idle VOL, kHz on SW, or idle BFO `+    0`. VOL/BFO only in overlay when adjusting.
