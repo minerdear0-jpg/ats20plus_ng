@@ -33,16 +33,22 @@ uint8_t oledBadgeWidth(const char* text, uint8_t sidePad = 0)
     return (uint8_t)(vis * 8 + 2 * sidePad);
 }
 
-void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0)
+void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, uint8_t visForce = 0, bool filled = true)
 {
     const DCfont* f = DEFAULT_FONT;
     uint8_t skip = 0;
-    while (text[skip] == ' ')
-        skip++;
-    uint8_t vis = oledBadgeVis(text);
+    uint8_t vis;
+    if (visForce)
+        vis = visForce;
+    else
+    {
+        while (text[skip] == ' ')
+            skip++;
+        vis = oledBadgeVis(text);
+    }
     if (vis > 6)
         vis = 6;
-    uint8_t boxW = oledBadgeWidth(text, sidePad);
+    uint8_t boxW = (uint8_t)(vis * 8 + 2 * sidePad);
     uint8_t pad = (vis * 8 < boxW) ? (uint8_t)((boxW - vis * 8) / 2) : 0;
 
     for (uint8_t page = 0; page < 2; page++)
@@ -54,7 +60,7 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0)
             uint8_t d = x;
             if ((uint8_t)(boxW - 1 - x) < d)
                 d = (uint8_t)(boxW - 1 - x);
-            uint8_t mask = 0xFF;
+            uint8_t mask = (page == 0) ? 0xFE : 0x7F;
             if (page == 0)
             {
                 if (d == 0)
@@ -74,7 +80,7 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0)
                     mask = 0x7F;
             }
 
-            uint8_t b = 0xFF;
+            uint8_t b = filled ? 0xFF : 0;
             if (x >= pad && x < pad + vis * 8)
             {
                 uint8_t ci = (uint8_t)((x - pad) / 8);
@@ -83,7 +89,8 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0)
                 if (c < f->first || c > f->last)
                     c = ' ';
                 uint16_t off = (uint16_t)(c - f->first) * 16 + (uint16_t)page * 8;
-                b = (uint8_t)~pgm_read_byte(&f->bitmap[off + col]);
+                uint8_t g = pgm_read_byte(&f->bitmap[off + col]);
+                b = filled ? (uint8_t)~g : g;
             }
             oled.sendData(b & mask);
         }
@@ -125,51 +132,62 @@ void oledClear7segBand()
     }
 }
 
-uint8_t oledFreqGap(uint8_t n)
+uint8_t oledFreqCharW(char c)
 {
-    if (n < 2)
-        return 0;
-    uint16_t w = (uint16_t)n * FREQ_CELL_W + (uint16_t)(n - 1) * FREQ_CELL_GAP;
-    if (w <= 128)
-        return FREQ_CELL_GAP;
-    w = (uint16_t)n * FREQ_CELL_W + (uint16_t)(n - 1);
-    return (w <= 128) ? 1 : 0;
+    uint8_t u = (uint8_t)c;
+    if (u == '.')
+        return FREQ_DOT_W;
+    if (u >= '0' && u <= '9')
+        return FREQ_CELL_W;
+    return 0;
 }
 
-uint8_t oledFreqWidth(uint8_t n, uint8_t gap)
+static void oledSendKenwoodCol(uint8_t pg, uint32_t g)
 {
-    if (!n)
-        return 0;
-    return (uint8_t)((uint16_t)n * FREQ_CELL_W + (n > 1 ? (uint16_t)(n - 1) * gap : 0));
+    g <<= FREQ_SHIFT;
+    twiWrite((uint8_t)(g >> (8 * pg)));
 }
 
-void oledBlit7segUp2(uint8_t x, const char* s, uint8_t gap)
+void oledBlit7segChar(uint8_t x, char ch)
 {
+    uint8_t c = (uint8_t)ch;
+    uint8_t slot = oledFreqCharW(ch);
+    if (!slot)
+        return;
     for (uint8_t pg = 0; pg < 4; pg++)
     {
-        oled.setCursor(x, (uint8_t)(UI_PAGE_FREQ - 1 + pg));
-        oled.startData();
-        for (uint8_t i = 0; s[i]; i++)
+        oledCmdDataStart(x, (uint8_t)(UI_PAGE_FREQ - 1 + pg));
+        if (c == '.')
         {
-            uint8_t c = (uint8_t)s[i];
-            if (c < 46 || c > 57)
-                c = 47;
-            uint16_t gi = (uint16_t)(c - 46) * 42;
-            for (uint8_t col = 0; col < FREQ_CELL_W; col++)
+            for (uint8_t col = 0; col < FREQ_DOT_W; col++)
             {
-                uint32_t g = pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + col]);
-                g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 14 + col]) << 8;
-                g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 28 + col]) << 16;
-                g <<= FREQ_SHIFT;
-                oled.sendData((uint8_t)(g >> (8 * pg)));
-            }
-            if (gap && s[i + 1])
-            {
-                for (uint8_t z = 0; z < gap; z++)
-                    oled.sendData(0);
+                uint32_t g = pgm_read_byte(&kFreqDot[col]);
+                g |= (uint32_t)pgm_read_byte(&kFreqDot[FREQ_DOT_W + col]) << 8;
+                g |= (uint32_t)pgm_read_byte(&kFreqDot[FREQ_DOT_W * 2 + col]) << 16;
+                oledSendKenwoodCol(pg, g);
             }
         }
-        oled.endData();
+        else
+        {
+            uint8_t d = (uint8_t)(c - '0');
+            uint8_t w = pgm_read_byte(&kFreqWidthKW[d]);
+            uint8_t pad = pgm_read_byte(&kFreqColOffKW[d]);
+            uint16_t off = pgm_read_word(&kKenwoodOff[d]);
+            const uint8_t* base = ssd1306xled_font16x24vfoIcom + off;
+            for (uint8_t z = 0; z < pad; z++)
+                twiWrite(0);
+            for (uint8_t col = 0; col < w; col++)
+            {
+                uint32_t g = pgm_read_byte(base + col);
+                g |= (uint32_t)pgm_read_byte(base + w + col) << 8;
+                g |= (uint32_t)pgm_read_byte(base + (uint16_t)w * 2 + col) << 16;
+                oledSendKenwoodCol(pg, g);
+            }
+            uint8_t rest = (uint8_t)(FREQ_CELL_W - pad - w);
+            for (uint8_t z = 0; z < rest; z++)
+                twiWrite(0);
+        }
+        twiStop();
     }
 }
 
@@ -198,15 +216,62 @@ void oledPrintMhz(uint8_t x0)
     }
 }
 
-void oledPrintSMeterLab(const char* text, uint8_t barX)
+void oledBlitSMeterGlyph(uint8_t x, char c)
 {
-    oled.setCursor(0, UI_PAGE_SECONDARY);
-    oled.fillLength(0, barX);
-    oled.setCursor(0, UI_PAGE_SECONDARY + 1);
-    oled.fillLength(0, barX);
-    oledSetFont(DEFAULT_FONT);
-    oled.setCursor(0, UI_PAGE_SECONDARY);
-    oled.print(text);
+    const DCfont* f = DEFAULT_FONT;
+    if (c < f->first || c > f->last)
+        c = ' ';
+    uint16_t base = (uint16_t)(c - f->first) * 16;
+    uint16_t col[8];
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        uint8_t lo = pgm_read_byte(&f->bitmap[base + i]);
+        uint8_t hi = pgm_read_byte(&f->bitmap[base + 8 + i]);
+        col[i] = ((uint16_t)lo | ((uint16_t)hi << 8)) >> SMETER_LAB_UP;
+    }
+    for (uint8_t page = 0; page < 2; page++)
+    {
+        oled.setCursor(x, UI_PAGE_SECONDARY + page);
+        oled.startData();
+        uint8_t mask = page ? 0x3F : 0xFC;
+        for (uint8_t i = 0; i < 8; i++)
+            oled.sendData((uint8_t)((page ? (col[i] >> 8) : col[i]) & mask));
+        oled.endData();
+    }
+}
+
+void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
+{
+    static uint8_t prevU = 255;
+    static uint8_t prevP = 255;
+    if (forceS || prevU == 255)
+    {
+        if (SMETER_LAB_X)
+        {
+            for (uint8_t page = 0; page < 2; page++)
+            {
+                oled.setCursor(0, UI_PAGE_SECONDARY + page);
+                oled.startData();
+                for (uint8_t z = 0; z < SMETER_LAB_X; z++)
+                    oled.sendData(0);
+                oled.endData();
+            }
+        }
+        oledBlitSMeterGlyph(SMETER_LAB_X, 'S');
+        prevU = 255;
+        prevP = 255;
+    }
+    if (forceS || sUnit != prevU)
+    {
+        oledBlitSMeterGlyph((uint8_t)(SMETER_LAB_X + 8), (char)('0' + sUnit));
+        prevU = sUnit;
+    }
+    uint8_t p = plus ? 1 : 0;
+    if (forceS || p != prevP)
+    {
+        oledBlitSMeterGlyph((uint8_t)(SMETER_LAB_X + 16), plus ? '+' : ' ');
+        prevP = p;
+    }
 }
 
 void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)

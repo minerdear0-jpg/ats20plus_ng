@@ -19,7 +19,8 @@ enum UiCmd : uint8_t
     CMD_STEP,
     CMD_BW,
     CMD_BAND,
-    CMD_MODE
+    CMD_MODE,
+    CMD_BRIGHT
 };
 extern uint8_t g_currentCmd;
 extern bool g_settingsActive;

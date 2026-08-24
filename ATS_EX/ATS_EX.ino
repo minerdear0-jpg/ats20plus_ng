@@ -11,9 +11,10 @@
 
 #include <SI4735.h>
 #include <EEPROM.h>
-#include <Tiny4kOLED.h>
+#include <Tiny4kOLED_common.h>
+#include "oled_bus.h"
 #include "font8x16pob_ui.h"
-#include "font14x24sevenSeg.h"
+#include "font16x24vfoIcom.h"
 #include "Rotary.h"
 #include "SimpleButton.h"
 
@@ -31,6 +32,7 @@ void switchCommand(uint8_t cmd = CMD_NONE, void (*showFunction)() = 0);
 void cycleModePick(int8_t dir);
 void commitModePick();
 void paintModeOrBand();
+void displayPower(bool on);
 
 int getLastStep()
 {
@@ -50,6 +52,9 @@ int getLastStep()
 #define APP_VERSION 123
 
 static uint8_t g_modePick = AM;
+static char g_ovTitle[5];
+static char g_ovVal[8];
+static uint8_t g_ovX, g_ovW, g_ovVisForce, g_ovFill;
 
 //Initialize controller
 // Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
@@ -136,9 +141,10 @@ void setup()
     PORTD |= (1 << ENCODER_PIN_B);
     g_voltagePinConnnected = analogRead(BATTERY_VOLTAGE_PIN) > 300;
 
-    oled.begin(128, 64, sizeof(tiny4koled_init_128x64br), tiny4koled_init_128x64br);
+    // Frozen: 128x64r (C8/A1 + pump). Do not use 128x64br / 0xAD 0x30 (hum).
+    oled.begin(128, 64, sizeof(tiny4koled_init_128x64r), tiny4koled_init_128x64r);
     oled.clear();
-    oled.on();
+    displayPower(true);
     oled.setFont(DEFAULT_FONT);
 
     //Don't use digitalRead()
@@ -427,8 +433,6 @@ void showFrequency(bool cleanDisplay = false)
     if (g_settingsActive)
         return;
 
-    g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
-
     char line[10];
     static char prevLine[10];
     static uint8_t prevOff = 255;
@@ -478,10 +482,21 @@ void showFrequency(bool cleanDisplay = false)
         }
     }
 
-    uint8_t nGlyphs = strlen8(line);
-    uint8_t gap = oledFreqGap(nGlyphs);
-    uint8_t pitch = (uint8_t)(FREQ_CELL_W + gap);
-    uint8_t pixW = oledFreqWidth(nGlyphs, gap);
+    uint8_t n = 0, ink = 0;
+    while (line[n])
+    {
+        ink = (uint8_t)(ink + oledFreqCharW(line[n]));
+        n++;
+    }
+    uint8_t gap = 0;
+    if (n >= 2)
+    {
+        if ((uint16_t)ink + (uint16_t)(n - 1) * FREQ_CELL_GAP <= 128)
+            gap = FREQ_CELL_GAP;
+        else if ((uint16_t)ink + (n - 1) <= 128)
+            gap = 1;
+    }
+    uint8_t pixW = (n < 2) ? ink : (uint8_t)((uint16_t)ink + (uint16_t)(n - 1) * gap);
     bool showMhz = g_bandIndex == FM_BAND_TYPE
         || (g_bandIndex == SW_BAND_TYPE && g_Settings[SettingsIndex::SWUnits].param == 1 && !isSSB());
     uint8_t extra = showMhz ? (uint8_t)(FREQ_MHZ_GAP + MHZ_LABEL_W) : 0;
@@ -489,52 +504,47 @@ void showFrequency(bool cleanDisplay = false)
     if (block > 128)
         block = 128;
     uint8_t off = (uint8_t)((128 - block) / 2);
-
-    if (cleanDisplay || prevOff != off)
-    {
-        oledClear7segBand();
-        prevLine[0] = 0;
-        prevOff = off;
-    }
-
-    while (line[i] && line[i] == prevLine[i])
-        i++;
-    if (line[i] || prevLine[i])
-    {
-        uint8_t oldLen = strlen8(prevLine);
-        char rest[10];
-        uint8_t n = 0;
-        while (line[i + n] && n < 9)
-        {
-            rest[n] = line[i + n];
-            n++;
-        }
-        while ((uint8_t)(i + n) < oldLen && n < 9)
-            rest[n++] = '/';
-        rest[n] = 0;
-        if (n)
-            oledBlit7segUp2((uint8_t)(off + i * pitch), rest, gap);
-        i = 0;
-        do
-        {
-            prevLine[i] = line[i];
-        } while (line[i++]);
-    }
+    uint8_t pn = 0;
+    while (prevLine[pn])
+        pn++;
+    bool full = cleanDisplay || prevOff != off || n != pn;
 
     g_freqRightX = (uint8_t)(off + pixW);
     uint8_t mhzX = (uint8_t)(g_freqRightX + FREQ_MHZ_GAP);
-    if (prevMhzX != 255 && (!showMhz || prevMhzX != mhzX))
+
+    if (full)
+    {
+        oledClear7segBand();
+        prevOff = off;
+        prevMhzX = 255;
+    }
+    else if (prevMhzX != 255 && (!showMhz || prevMhzX != mhzX))
     {
         oled.setCursor(prevMhzX, UI_PAGE_FREQ + 1);
         oled.fillLength(0, MHZ_LABEL_W);
         oled.setCursor(prevMhzX, UI_PAGE_FREQ + 2);
         oled.fillLength(0, MHZ_LABEL_W);
+        prevMhzX = 255;
     }
+
+    uint8_t x = off;
+    for (i = 0; i < n; i++)
+    {
+        if (full || line[i] != prevLine[i])
+            oledBlit7segChar(x, line[i]);
+        x = (uint8_t)(x + oledFreqCharW(line[i]));
+        if (line[i + 1])
+            x = (uint8_t)(x + gap);
+    }
+    i = 0;
+    do
+    {
+        prevLine[i] = line[i];
+    } while (line[i++]);
+
     if (showMhz)
         oledPrintMhz(mhzX);
     prevMhzX = showMhz ? mhzX : 255;
-
-    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }
 
 //This function is called by station seek logic
@@ -863,28 +873,73 @@ void switchSettings()
 }
 
 //Draw curremt modulation
+void overlayChip(bool filled)
+{
+    oledPrintModeBadge(g_ovVal, g_ovX, BADGE_PAD, g_ovVisForce, filled);
+    g_ovFill = filled ? 1 : 0;
+}
+
 void paintTransient(const char* title, const char* value)
 {
-    oled.setCursor(0, 0);
-    oled.fillLength(0, 128);
-    oled.setCursor(0, 1);
-    oled.fillLength(0, 128);
-
-    oledPrint(title, 0, 0, DEFAULT_FONT);
-    uint8_t tw = 0;
-    while (title[tw])
-        tw++;
-    uint8_t badgeW = oledBadgeWidth(value, BADGE_PAD);
-    uint8_t badgeX = (uint8_t)(128 - badgeW);
-    oledSetFont(DEFAULT_FONT);
-    oled.setCursor(tw * 8, 0);
-    uint8_t x = tw * 8;
-    while (x + 8 <= badgeX)
+    uint8_t visForce = 0;
+    if (title[0] == 'V' && title[1] == 'O')
+        visForce = 2;
+    else if (title[0] == 'B' && title[1] == 'R')
+        visForce = 3;
+    uint8_t i = 0;
+    while (value[i] && i < 7)
     {
-        oled.print(".");
-        x += 8;
+        g_ovVal[i] = value[i];
+        i++;
     }
-    oledPrintModeBadge(value, badgeX, BADGE_PAD);
+    g_ovVal[i] = 0;
+    g_ovVisForce = visForce;
+    uint8_t badgeW = visForce ? (uint8_t)(visForce * 8 + 2 * BADGE_PAD)
+                              : oledBadgeWidth(value, BADGE_PAD);
+    uint8_t badgeX = (uint8_t)(128 - badgeW);
+    bool chrome = (g_uiLayer != UI_LAYER_TRANSIENT) || (badgeW != g_ovW);
+    if (!chrome)
+    {
+        i = 0;
+        while (title[i] && i < 4)
+        {
+            if (title[i] != g_ovTitle[i])
+                chrome = true;
+            i++;
+        }
+        if (g_ovTitle[i])
+            chrome = true;
+    }
+    i = 0;
+    while (title[i] && i < 4)
+    {
+        g_ovTitle[i] = title[i];
+        i++;
+    }
+    g_ovTitle[i] = 0;
+    g_ovX = badgeX;
+    g_ovW = badgeW;
+
+    if (chrome)
+    {
+        oled.setCursor(0, 0);
+        oled.fillLength(0, 128);
+        oled.setCursor(0, 1);
+        oled.fillLength(0, 128);
+        oledPrint(title, 0, 0, DEFAULT_FONT);
+        uint8_t tw = 0;
+        while (title[tw])
+            tw++;
+        oledSetFont(DEFAULT_FONT);
+        uint8_t x = tw * 8;
+        oled.setCursor(x, 0);
+        while (x + 8 <= badgeX)
+        {
+            oled.print(".");
+            x += 8;
+        }
+    }
+    overlayChip(true);
     g_uiLayer = UI_LAYER_TRANSIENT;
 }
 
@@ -930,6 +985,15 @@ void showVolume()
     if (g_currentCmd != CMD_VOLUME)
         return;
     paintTransient("VOL", buf);
+}
+
+void showBrightness()
+{
+    if (g_settingsActive || g_currentCmd != CMD_BRIGHT)
+        return;
+    char buf[4];
+    convertToChar(buf, (uint16_t)g_Settings[SettingsIndex::Brightness].param, 3);
+    paintTransient("BRT", buf);
 }
 
 #if USE_RDS
@@ -1132,33 +1196,26 @@ void showSMeter()
     bool dotDirty = (dot != drawnDot);
 
     uint8_t barW = (uint8_t)(SMETER_CUBES * SMETER_SEG_W + (SMETER_CUBES - 1) * SMETER_SEG_GAP);
-    uint8_t x0 = SMETER_LAB_W;
+    uint8_t x0 = (uint8_t)(SMETER_LAB_X + SMETER_LAB_W + SMETER_LAB_GAP);
     static uint8_t prevBarX = 255;
     if (val == g_sMeterDrawnVal && smPeak == smDrawnPeak && !dotDirty && x0 == prevBarX)
         return;
 
-    g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
-    if (val != g_sMeterDrawnVal || x0 != prevBarX)
     {
-        char lab[4];
-        lab[0] = 'S';
-        lab[1] = (char)('0' + sUnit);
-        lab[2] = plusDb ? '+' : ' ';
-        lab[3] = 0;
-        oledPrintSMeterLab(lab, x0);
-    }
-    if (val != g_sMeterDrawnVal || smPeak != smDrawnPeak || dotDirty || x0 != prevBarX)
-    {
+        oledPrintSMeterLab(sUnit, plusDb != 0, g_sMeterDrawnVal == 255);
         // First 7 cubes = S1..S9; last cube = any S9+ (label '+'), not extra +10/+40 cells.
         uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
         uint8_t pk = (smPeak >= 10) ? SMETER_CUBES : (uint8_t)((smPeak * (SMETER_CUBES - 1) + 4) / 9);
         uint8_t tailX = (uint8_t)(x0 + barW);
-        if (g_currentMode == FM && (dot || drawnDot))
+        bool stereoSlot = (g_currentMode == FM && (dot || drawnDot));
+        if (stereoSlot)
             tailX = (uint8_t)(tailX + SMETER_DOT_GAP + SMETER_DOT_W);
         for (uint8_t pg = 0; pg < 2; pg++)
         {
-            oled.setCursor(x0, UI_PAGE_SECONDARY + pg);
+            oled.setCursor((uint8_t)(SMETER_LAB_X + SMETER_LAB_W), UI_PAGE_SECONDARY + pg);
             oled.startData();
+            for (uint8_t z = 0; z < SMETER_LAB_GAP; z++)
+                oled.sendData(0);
             for (uint8_t i = 0; i < SMETER_CUBES; i++)
             {
                 uint8_t kind = 0;
@@ -1193,7 +1250,7 @@ void showSMeter()
                         oled.sendData(0);
                 }
             }
-            if (g_currentMode == FM)
+            if (stereoSlot)
             {
                 for (uint8_t z = 0; z < SMETER_DOT_GAP; z++)
                     oled.sendData(0);
@@ -1212,19 +1269,14 @@ void showSMeter()
                     oled.sendData(pg ? (uint8_t)(col >> 8) : (uint8_t)col);
                 }
             }
+            oled.repeatData(0, (uint8_t)(128 - tailX));
             oled.endData();
-            if (tailX < 128)
-            {
-                oled.setCursor(tailX, UI_PAGE_SECONDARY + pg);
-                oled.fillLength(0, (uint8_t)(128 - tailX));
-            }
         }
         g_sMeterDrawnVal = val;
         smDrawnPeak = smPeak;
         drawnDot = dot;
         prevBarX = x0;
     }
-    g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }
 
 //Draw bandwidth (Ignored for CW mode)
@@ -1370,16 +1422,15 @@ uint16_t getNextSWSuBband(bool up)
 void bandSwitch(bool up)
 {
     uint16_t nextSW = getNextSWSuBband(up);
-    
+
     if (g_bandIndex == SW_BAND_TYPE && nextSW != 0)
     {
         g_currentFrequency = nextSW;
-
         g_currentBFO = 0;
         if (isSSB())
             updateBFO();
         g_si4735.setFrequency(nextSW);
-        agcSetFunc(); //Re-apply to remove noize
+        agcSetFunc();
         uiMark(UI_FREQ, true);
     }
     else
@@ -1612,7 +1663,7 @@ void doDisplayOff(int8_t v)
     if (g_Settings[SettingsIndex::DisplayOff].param == 0 && !g_displayOn)
     {
         g_displayOn = true;
-        oled.on();
+        displayPower(true);
     }
     g_lastInputMs = millis();
 }
@@ -1730,6 +1781,8 @@ void doBandwidth(uint8_t v)
 
 void switchCommand(uint8_t cmd, void (*showFunction)())
 {
+    uint8_t prev = g_currentCmd;
+
     if (cmd == CMD_NONE)
     {
         g_currentCmd = CMD_NONE;
@@ -1738,6 +1791,8 @@ void switchCommand(uint8_t cmd, void (*showFunction)())
         restoreIdleHeader();
         showStep();
         showVolume();
+        if (prev == CMD_BRIGHT)
+            saveAllReceiverInformation();
         return;
     }
 
@@ -1764,6 +1819,8 @@ void switchCommand(uint8_t cmd, void (*showFunction)())
         showFunction();
     if (g_currentCmd == CMD_BAND || g_currentCmd == CMD_MODE)
         paintModeOrBand();
+    if (prev == CMD_BRIGHT && g_currentCmd != CMD_BRIGHT)
+        saveAllReceiverInformation();
 }
 
 void resetLowerLine()
@@ -1777,12 +1834,27 @@ void resetLowerLine()
 
 static const uint8_t kDispOffSec[] = { 0, 15, 30, 60, 120 };
 
+void displayPower(bool on)
+{
+    if (on)
+    {
+        oled.enableChargePump();
+        oled.on();
+    }
+    else
+    {
+        oled.disableChargePump();
+        oled.off();
+    }
+}
+
 void displayWake()
 {
     if (!g_displayOn)
     {
         g_displayOn = true;
-        oled.on();
+        displayPower(true);
+        restoreIdleHeader();
     }
     g_lastInputMs = millis();
 }
@@ -1795,7 +1867,7 @@ void displaySleepIfDue()
     if ((millis() - g_lastInputMs) < (uint32_t)kDispOffSec[p] * 1000UL)
         return;
     g_displayOn = false;
-    oled.off();
+    displayPower(false);
 }
 
 void cycleModePick(int8_t dir)
@@ -1915,6 +1987,12 @@ void loop()
             g_uiLayer = UI_LAYER_TRANSIENT;
             doVolume(g_encoderCount);
         }
+        else if (g_currentCmd == CMD_BRIGHT)
+        {
+            g_uiLayer = UI_LAYER_TRANSIENT;
+            doBrightness(g_encoderCount);
+            showBrightness();
+        }
         else if (g_currentCmd == CMD_STEP)
         {
             g_uiLayer = UI_LAYER_TRANSIENT;
@@ -1963,10 +2041,21 @@ void loop()
         poke |= btn_VolumeUp.checkEvent(simpleEvent);
         poke |= btn_VolumeDn.checkEvent(simpleEvent);
         poke |= btn_Encoder.checkEvent(simpleEvent);
-        poke |= btn_AGC.checkEvent(simpleEvent);
         poke |= btn_Step.checkEvent(simpleEvent);
         poke |= btn_Mode.checkEvent(simpleEvent);
-        if (poke)
+        uint8_t agcOff = btn_AGC.checkEvent(agcEvent);
+        if (BUTTONEVENT_SHORTPRESS == agcOff)
+            displayWake();
+        else if (BUTTONEVENT_FIRSTLONGPRESS == agcOff)
+        {
+            displayWake();
+            if (!g_settingsActive)
+            {
+                switchCommand(CMD_BRIGHT, showBrightness);
+                g_uiLayer = UI_LAYER_TRANSIENT;
+            }
+        }
+        else if (poke)
             displayWake();
         else if (millis() - g_lastFreqChange >= BACKGROUND_UI_MS && !g_radioError)
             applySquelchNow();
@@ -1985,9 +2074,24 @@ void loop()
 #endif
     }
 
-    if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT
-        && g_currentCmd != CMD_STEP && g_currentCmd != CMD_MODE)
-        switchCommand();
+    if (g_uiLayer == UI_LAYER_TRANSIENT && g_lastAdjustmentTime != 0)
+    {
+        uint32_t dt = millis() - g_lastAdjustmentTime;
+        if (dt >= ADJUSTMENT_ACTIVE_TIMEOUT + OVERLAY_BLINK_MS)
+        {
+            if (g_currentCmd == CMD_MODE)
+                commitModePick();
+            switchCommand();
+        }
+        else if (dt > ADJUSTMENT_ACTIVE_TIMEOUT)
+        {
+            uint16_t ph = (uint16_t)(dt - ADJUSTMENT_ACTIVE_TIMEOUT);
+            bool fill = (ph < OVERLAY_FLASH_MS)
+                || (ph >= (uint16_t)(OVERLAY_FLASH_MS + OVERLAY_FLASH_GAP_MS));
+            if ((uint8_t)(fill ? 1 : 0) != g_ovFill)
+                overlayChip(fill);
+        }
+    }
 
     //Command-checkers
     if (BUTTONEVENT_SHORTPRESS == btn_Bandwidth.checkEvent(simpleEvent))
@@ -2094,20 +2198,37 @@ void loop()
     {
         if (!g_settingsActive || (g_settingsActive && !g_displayOn))
         {
-            g_displayOn = !g_displayOn;
             if (g_displayOn)
-                oled.on();
+            {
+                if (g_currentCmd != CMD_NONE)
+                    switchCommand();
+                g_displayOn = false;
+                displayPower(false);
+            }
             else
-                oled.off();
+            {
+                g_displayOn = true;
+                displayPower(true);
+            }
             g_lastInputMs = millis();
         }
     }
-    if (BUTTONEVENT_LONGPRESS == agcEvent)
+    if (BUTTONEVENT_FIRSTLONGPRESS == agcEvent)
     {
         if (!g_settingsActive)
         {
-            if (isSSB())
-                doSync(1);
+            if (g_currentCmd == CMD_BRIGHT)
+                switchCommand();
+            else
+            {
+                if (!g_displayOn)
+                {
+                    g_displayOn = true;
+                    displayPower(true);
+                }
+                switchCommand(CMD_BRIGHT, showBrightness);
+                g_uiLayer = UI_LAYER_TRANSIENT;
+            }
         }
     }
     uint8_t stepEvent = btn_Step.checkEvent(stepEvent);
@@ -2147,8 +2268,7 @@ void loop()
             else
             {
                 g_modePick = g_currentMode;
-                g_currentCmd = CMD_MODE;
-                paintModeOrBand();
+                switchCommand(CMD_MODE);
             }
         }
     }

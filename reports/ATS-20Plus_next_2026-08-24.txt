@@ -2,7 +2,7 @@ ATS-20Plus_next — срез 24 августа 2026
 Ветка: ATS-20Plus_next (локально, без push). HEAD: 3715ff6 + CLKPR A + g_uiFreqClean + prop. 7-seg (не git).
 Железо теста: кремний 328PB (ISP), USB Optiboot как 328P 115200. Сборка `./build.sh --fast uno`; USB `./build.sh --fast --upload` (avrdude -p m328p).
 CLKPR A на PB тот же: всегда 16 МГц, CPU из SYS снят. Слух после прошивки.
-Flash: 31986 / 32256 (FM: MHz +7 px, шкала слева; не в git). SRAM: 1269 / 2048.
+Flash: 32184 / 32256 (Kenwood 7-seg слух, 72 B запас). SRAM: 1270 / 2048.
 На железе до CLKPR A: зазоры, S9/S9+, пульс стерео, overlay STEP с кликом, шапка не режет 7-seg.
 CLKPR A: USB залита (31952, verify OK). Слух лидера: как раньше, явных дефектов нет.
 
@@ -74,3 +74,14 @@ g_uiFreqClean (лидер go, 24 августа)
 
 Процесс:
   Один эксперимент = один commit = avr-size = слух. build/ не в git. Push только по просьбе.
+
+------------------------------------------------------------------------
+Freeze (вечер 24 августа, рабочий срез)
+
+Flash 31088 / 32256, SRAM 1095. TWI: TwiFastWire, SI4735 на twi_fast; Arduino Wire нет в образе.
+OLED: tiny4koled_init_128x64r, displayPower = pump + on/off. AGC короткое = экран; длинное = BRT overlay.
+Overlay TITLE…[чип]: MODE/BAND/STEP/VOL/BW/BFO/BRT. MODE на SW — 2 с + две вспышки, как остальные.
+S-meter: S9+ шрифт чипов в полосе кубов; зазор после +; чипы BADGE_PAD 2 и 1 px сверху/снизу.
+VFO: font16x24vfoIcom.h, слот 16 px. «2» принята, шею не трогать. Банки/MEM и chrome SYS — не в этом срезе.
+TWI / 128x64r / Kenwood-слоты не открывать без GO.
+

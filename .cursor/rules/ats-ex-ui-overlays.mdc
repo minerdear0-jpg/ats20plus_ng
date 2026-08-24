@@ -8,7 +8,7 @@ alwaysApply: true
 
 Do not use a full-width inverted header for menus or transients.
 
-**Selection overlay** (MODE, BAND, STEP, VOL, BW, BFO): one 16 px row.
+**Selection overlay** (MODE, BAND, STEP, VOL, BW, BFO, BRT): one 16 px row.
 
 ```
 TITLE ............... [VALUE]
@@ -16,23 +16,23 @@ TITLE ............... [VALUE]
 
 **Font roles**
 
-- **14×24** seven-seg: frequency only (hero). Do not replace with 6×8. Glyph is 14 px; **2 px gap** between cells (1 px if 8 digits would overflow). Packed `kFreqW` blit is off — unreadable.
-- **8×16** Pixel Operator: idle chips, overlay TITLE / focus, S-meter `S9+` (same 16 px row as the cubes).
+- **Icom-inspired 16×24** VFO digits (3 px stroke, open counters): frequency only (hero). Each digit occupies a **16 px slot** (`kFreqColOffKW` is left bearing in that slot); the decimal is 4 px. **4 px gap** between slots (1 px if 8 glyphs would overflow). Redraw only slots whose character changed — do not slide the whole row when `1` vs `8`. Packed proportional blit is off. Geometry lives in `fonts/vfo_icom_geom.py`.
+- **8×16** Pixel Operator: idle chips, overlay TITLE / focus, S-meter `S9+` (same font as chip labels, shifted up `SMETER_LAB_UP` px into the cube band, 2 px empty top and bottom). Same 16 px row as the cubes. Gap after `+` equals the `+` glyph width (8 px), then cubes.
 - **Karat 5×7**: MHz, STEREO, small secondary / RDS / service marks. Not the S-meter label — 5×7 cannot fill the 16 px cubes.
 
 - Title: normal 8×16, left.
 - Leader dots between title and chip.
 - Value: rounded inverted chip (`oledPrintModeBadge`, `paintTransient`).
-- Chip fill is **+3 px** after the last glyph and **+3 px** before the first (`BADGE_PAD`). Same for idle chips.
-- Encoder changes the chip; confirm with encoder click where the radio would otherwise blink (MODE). STEP also waits for confirm (no timeout).
+- Chip fill is **+2 px** after the last glyph and **+2 px** before the first (`BADGE_PAD`). **1 px** inset top and bottom of the 16 px row. Same for idle chips.
+- Encoder changes **only the chip**, not the title/dots/VFO digits. After **2 s** idle: two fill flashes of **250 ms** with **125 ms** between them, then apply and hide the row. Click confirms immediately.
 
 **Idle chips** (black on filled rounded rect):
 
 - Mode AM/LSB/USB/CW/WFM: top-left. Two-letter labels centered in the chip (`WFM` is three letters).
 - Filter width: top-center on SW **and** WFM (`AUTO`, `110k`, `3.0k`, CW `0.5k`). Not plain text.
-- WFM stereo: hidden until a stereo pilot. Then a filled 10 px circle after the last S-meter cell; after 2 s of stable stereo it heartbeats (1 s on / 1 s off, 2 s period). Only on the S-meter, only WFM. Not beside the 7-seg. `MHz` is 5×7 on the bottom page of the frequency. Idle mode chip on FM is `WFM`.
+- WFM stereo: hidden until a stereo pilot. Then a filled 10 px circle after the last S-meter cell; after 2 s of stable stereo it heartbeats (1 s on / 1 s off, 2 s period). Only on the S-meter, only WFM. Not beside the VFO digits. `MHz` is 5×7 on the bottom page of the frequency. Idle mode chip on FM is `WFM`.
 - BAND overlay FM tag is `WFM`, CB is `CB`. No band tag on idle.
 
-Do not add idle VOL, kHz on SW, or idle BFO `+    0`. VOL/BFO only in overlay when adjusting.
+Do not add idle VOL, BRT, kHz on SW, or idle BFO `+    0`. VOL/BFO/BRT only in overlay when adjusting.
 
 New settings and transients must use this pattern, not a new menu chrome.
