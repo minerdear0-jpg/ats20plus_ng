@@ -216,6 +216,60 @@ void oledPrintMhz(uint8_t x0)
     }
 }
 
+// Inverted chip above MHz (pages 2–3). Glyph: outer parens 9 px, inner 5 px, 3×3 dot.
+void oledPrintStereoChip(uint8_t x0, bool on)
+{
+    static const uint16_t kStereo[] PROGMEM = {
+        0x0000, 0x0FF8, 0x0808, 0x0000,
+        0x03E0, 0x0220, 0x0000,
+        0x01C0, 0x01C0, 0x01C0,
+        0x0000, 0x0220, 0x03E0, 0x0000,
+        0x0808, 0x0FF8, 0x0000
+    };
+    if ((uint16_t)x0 + MHZ_LABEL_W > 128)
+        x0 = (uint8_t)(128 - MHZ_LABEL_W);
+    uint8_t boxW = MHZ_LABEL_W;
+    for (uint8_t page = 0; page < 2; page++)
+    {
+        oled.setCursor(x0, (uint8_t)(UI_PAGE_FREQ - 1 + page));
+        oled.startData();
+        for (uint8_t x = 0; x < boxW; x++)
+        {
+            if (!on)
+            {
+                oled.sendData(0);
+                continue;
+            }
+            uint8_t d = x;
+            if ((uint8_t)(boxW - 1 - x) < d)
+                d = (uint8_t)(boxW - 1 - x);
+            uint8_t mask = (page == 0) ? 0xFE : 0x7F;
+            if (page == 0)
+            {
+                if (d == 0)
+                    mask = 0xF8;
+                else if (d == 1)
+                    mask = 0xFC;
+                else if (d == 2)
+                    mask = 0xFE;
+            }
+            else
+            {
+                if (d == 0)
+                    mask = 0x1F;
+                else if (d == 1)
+                    mask = 0x3F;
+                else if (d == 2)
+                    mask = 0x7F;
+            }
+            uint16_t g = pgm_read_word(&kStereo[x]);
+            uint8_t ink = page ? (uint8_t)(g >> 8) : (uint8_t)g;
+            oled.sendData((uint8_t)((0xFF ^ ink) & mask));
+        }
+        oled.endData();
+    }
+}
+
 void oledBlitSMeterGlyph(uint8_t x, char c)
 {
     const DCfont* f = DEFAULT_FONT;

@@ -427,6 +427,7 @@ void resetEepromDelay()
 //Draw frequency.
 //BFO and main frequency produce actual frequency that is displayed on LCD
 static uint8_t g_freqRightX;
+static uint8_t g_stereoVis;
 
 void showFrequency(bool cleanDisplay = false)
 {
@@ -520,6 +521,10 @@ void showFrequency(bool cleanDisplay = false)
     }
     else if (prevMhzX != 255 && (!showMhz || prevMhzX != mhzX))
     {
+        oled.setCursor(prevMhzX, (uint8_t)(UI_PAGE_FREQ - 1));
+        oled.fillLength(0, MHZ_LABEL_W);
+        oled.setCursor(prevMhzX, UI_PAGE_FREQ);
+        oled.fillLength(0, MHZ_LABEL_W);
         oled.setCursor(prevMhzX, UI_PAGE_FREQ + 1);
         oled.fillLength(0, MHZ_LABEL_W);
         oled.setCursor(prevMhzX, UI_PAGE_FREQ + 2);
@@ -544,6 +549,8 @@ void showFrequency(bool cleanDisplay = false)
 
     if (showMhz)
         oledPrintMhz(mhzX);
+    if (g_bandIndex == FM_BAND_TYPE)
+        oledPrintStereoChip(mhzX, g_stereoVis);
     prevMhzX = showMhz ? mhzX : 255;
 }
 
@@ -1121,9 +1128,8 @@ void showSMeter()
         return;
 
     static uint32_t sMeterUpdated = 0;
-    static uint8_t smPeak = 0;
-    static uint8_t smDrawnPeak = 255;
-    static uint32_t smPeakMs = 0;
+    static uint8_t peakX = 0;
+    static uint8_t smDrawnPeakX = 255;
     uint32_t now = millis();
     if (g_sMeterDrawnVal != 255 && now - sMeterUpdated < 100)
         return;
@@ -1132,18 +1138,30 @@ void showSMeter()
     g_si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = g_si4735.getCurrentRSSI();
     handleSquelch(rssi);
+
+    static uint8_t smHystRssi = 0;
+    if (g_sMeterDrawnVal == 255)
+        smHystRssi = rssi;
+    else if (rssi > smHystRssi)
+    {
+        if ((uint8_t)(rssi - smHystRssi) >= SMETER_HYST_DB)
+            smHystRssi = rssi;
+    }
+    else if ((uint8_t)(smHystRssi - rssi) >= SMETER_HYST_DB)
+        smHystRssi = rssi;
+
     uint8_t sUnit;
     uint8_t plusDb = 0;
-    if (rssi >= S9_DBUV)
+    if (smHystRssi >= S9_DBUV)
     {
         sUnit = 9;
-        plusDb = rssi - S9_DBUV;
+        plusDb = smHystRssi - S9_DBUV;
         if (plusDb > SMETER_MAX_OVER_S9)
             plusDb = SMETER_MAX_OVER_S9;
     }
     else
     {
-        sUnit = (uint8_t)((rssi + 20) / 6);
+        sUnit = (uint8_t)((smHystRssi + 20) / 6);
         if (sUnit > 9)
             sUnit = 9;
     }
@@ -1159,121 +1177,113 @@ void showSMeter()
     if (val > SMETER_LEVELS - 1)
         val = SMETER_LEVELS - 1;
 
-    if (g_sMeterDrawnVal == 255)
-    {
-        smPeak = val;
-        smDrawnPeak = 255;
-        smPeakMs = now;
-    }
-    else if (val > smPeak)
-    {
-        smPeak = val;
-        smPeakMs = now;
-    }
-    else if (val < smPeak && now - smPeakMs >= SMETER_RELEASE_MS)
-    {
-        smPeak--;
-        smPeakMs = now;
-    }
-
-    static uint32_t stereoOnMs = 0;
     static uint8_t drawnDot = 255;
     uint8_t dot = 0;
     if (g_currentMode == FM)
     {
-        bool st = g_si4735.getCurrentPilot();
-        if (st != g_fmStereo)
-        {
-            g_fmStereo = st;
-            stereoOnMs = now;
-        }
-        if (st)
-        {
-            uint32_t age = now - stereoOnMs;
-            dot = (age < 2000) ? 1 : (uint8_t)((age >> 10) & 1);
-        }
+        g_fmStereo = g_si4735.getCurrentPilot();
+        if (g_fmStereo)
+            dot = 1;
     }
     bool dotDirty = (dot != drawnDot);
 
     uint8_t barW = (uint8_t)(SMETER_CUBES * SMETER_SEG_W + (SMETER_CUBES - 1) * SMETER_SEG_GAP);
+    // First 7 cubes = S1..S9; last cube = any S9+ (label '+').
+    uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
+    uint8_t liveX = 0;
+    if (cur)
+    {
+        liveX = (uint8_t)(cur * SMETER_SEG_W + (cur - 1) * SMETER_SEG_GAP);
+        if (liveX > (uint8_t)(barW - 2))
+            liveX = (uint8_t)(barW - 2);
+    }
+    if (g_sMeterDrawnVal == 255)
+        peakX = liveX;
+    else if (liveX > peakX)
+        peakX = liveX;
+    else if (peakX > liveX)
+    {
+        uint8_t d = (uint8_t)((peakX - liveX + 3) / 4);
+        if (d == 0)
+            d = 1;
+        peakX = (uint8_t)(peakX - d);
+    }
     uint8_t x0 = (uint8_t)(SMETER_LAB_X + SMETER_LAB_W + SMETER_LAB_GAP);
     static uint8_t prevBarX = 255;
-    if (val == g_sMeterDrawnVal && smPeak == smDrawnPeak && !dotDirty && x0 == prevBarX)
+    uint8_t mhzX = (uint8_t)(g_freqRightX + FREQ_MHZ_GAP);
+    static uint8_t stereoX = 255;
+    g_stereoVis = (g_bandIndex == FM_BAND_TYPE) ? dot : 0;
+    if (g_bandIndex == FM_BAND_TYPE)
+    {
+        oledPrintStereoChip(mhzX, g_stereoVis);
+        stereoX = mhzX;
+    }
+    else if (stereoX != 255)
+    {
+        oledPrintStereoChip(stereoX, false);
+        stereoX = 255;
+    }
+    if (val == g_sMeterDrawnVal && peakX == smDrawnPeakX && !dotDirty && x0 == prevBarX)
+    {
+        drawnDot = dot;
         return;
+    }
 
     {
         oledPrintSMeterLab(sUnit, plusDb != 0, g_sMeterDrawnVal == 255);
-        // First 7 cubes = S1..S9; last cube = any S9+ (label '+'), not extra +10/+40 cells.
-        uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
-        uint8_t pk = (smPeak >= 10) ? SMETER_CUBES : (uint8_t)((smPeak * (SMETER_CUBES - 1) + 4) / 9);
         uint8_t tailX = (uint8_t)(x0 + barW);
-        bool stereoSlot = (g_currentMode == FM && (dot || drawnDot));
-        if (stereoSlot)
-            tailX = (uint8_t)(tailX + SMETER_DOT_GAP + SMETER_DOT_W);
         for (uint8_t pg = 0; pg < 2; pg++)
         {
             oled.setCursor((uint8_t)(SMETER_LAB_X + SMETER_LAB_W), UI_PAGE_SECONDARY + pg);
             oled.startData();
             for (uint8_t z = 0; z < SMETER_LAB_GAP; z++)
                 oled.sendData(0);
+            uint8_t col = 0;
             for (uint8_t i = 0; i < SMETER_CUBES; i++)
             {
-                uint8_t kind = 0;
-                if (i < cur)
-                    kind = 1;
-                else if (i < pk)
-                    kind = 2;
+                bool fill = (i < cur);
                 for (uint8_t w = 0; w < SMETER_SEG_W; w++)
                 {
                     bool side = (w == 0 || w == (uint8_t)(SMETER_SEG_W - 1));
                     uint8_t d0, d1;
-                    if (kind == 1)
+                    if (fill)
                     {
                         d0 = 0xFC;
                         d1 = 0x3F;
-                    }
-                    else if (kind == 2 && !side)
-                    {
-                        d0 = (uint8_t)(0x04 | (0x54 & 0xF8));
-                        d1 = (uint8_t)(0x20 | (0x55 & 0x1F));
                     }
                     else
                     {
                         d0 = side ? 0xFC : 0x04;
                         d1 = side ? 0x3F : 0x20;
                     }
+                    if (col == peakX || col == (uint8_t)(peakX + 1))
+                    {
+                        d0 = 0xFF;
+                        d1 = 0xFF;
+                    }
                     oled.sendData(pg ? d1 : d0);
+                    col++;
                 }
                 if (i != SMETER_CUBES - 1)
                 {
                     for (uint8_t z = 0; z < SMETER_SEG_GAP; z++)
-                        oled.sendData(0);
-                }
-            }
-            if (stereoSlot)
-            {
-                for (uint8_t z = 0; z < SMETER_DOT_GAP; z++)
-                    oled.sendData(0);
-                for (uint8_t w = 0; w < SMETER_DOT_W; w++)
-                {
-                    uint16_t col = 0;
-                    if (dot)
                     {
-                        if (w == 0 || w == 9)
-                            col = 0x03C0;
-                        else if (w == 1 || w == 8)
-                            col = 0x0FF0;
-                        else
-                            col = 0x1FF8;
+                        uint8_t d0 = 0, d1 = 0;
+                        if (col == peakX || col == (uint8_t)(peakX + 1))
+                        {
+                            d0 = 0xFF;
+                            d1 = 0xFF;
+                        }
+                        oled.sendData(pg ? d1 : d0);
+                        col++;
                     }
-                    oled.sendData(pg ? (uint8_t)(col >> 8) : (uint8_t)col);
                 }
             }
             oled.repeatData(0, (uint8_t)(128 - tailX));
             oled.endData();
         }
         g_sMeterDrawnVal = val;
-        smDrawnPeak = smPeak;
+        smDrawnPeakX = peakX;
         drawnDot = dot;
         prevBarX = x0;
     }

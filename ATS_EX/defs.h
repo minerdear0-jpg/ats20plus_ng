@@ -65,13 +65,12 @@
 #define SMETER_CUBES 8
 #define SMETER_SEG_W 7
 #define SMETER_SEG_GAP 3
-#define SMETER_DOT_W 10
-#define SMETER_DOT_GAP 7
 #define SMETER_LAB_X 3
 #define SMETER_LAB_W 24
 #define SMETER_LAB_GAP 7
 #define SMETER_LAB_UP 1
-#define SMETER_RELEASE_MS 800
+// Deadband on RSSI before S-unit / peak needle may move.
+#define SMETER_HYST_DB 3
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 2000
 #define OVERLAY_FLASH_MS 250
