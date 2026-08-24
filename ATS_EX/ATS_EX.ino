@@ -1122,13 +1122,31 @@ void showStep()
     paintTransient("STEP", buf);
 }
 
+// 1C (chosen): sandwich black-white-black. 1A XOR lost on fill; 1B cap rejected.
+static void smApplyNeedle(uint8_t col, uint8_t peakX, uint8_t* d0, uint8_t* d1)
+{
+    uint8_t i = (uint8_t)(col - peakX);
+    if (i >= SMETER_NEEDLE_W)
+        return;
+    if (i == 1)
+    {
+        *d0 = 0xFF;
+        *d1 = 0xFF;
+    }
+    else
+    {
+        *d0 = 0;
+        *d1 = 0;
+    }
+}
+
 void showSMeter()
 {
     if (g_settingsActive)
         return;
 
     static uint32_t sMeterUpdated = 0;
-    static uint8_t peakX = 0;
+    static uint8_t peakQ = 0;
     static uint8_t smDrawnPeakX = 255;
     uint32_t now = millis();
     if (g_sMeterDrawnVal != 255 && now - sMeterUpdated < 100)
@@ -1194,20 +1212,30 @@ void showSMeter()
     if (cur)
     {
         liveX = (uint8_t)(cur * SMETER_SEG_W + (cur - 1) * SMETER_SEG_GAP);
-        if (liveX > (uint8_t)(barW - 2))
-            liveX = (uint8_t)(barW - 2);
+        if (liveX > (uint8_t)(barW - SMETER_NEEDLE_W))
+            liveX = (uint8_t)(barW - SMETER_NEEDLE_W);
     }
+    uint8_t liveQ = (uint8_t)((uint16_t)liveX * SMETER_PEAK_NUM / SMETER_PEAK_DEN);
     if (g_sMeterDrawnVal == 255)
-        peakX = liveX;
-    else if (liveX > peakX)
-        peakX = liveX;
-    else if (peakX > liveX)
+        peakQ = liveQ;
+    else if (liveQ > peakQ)
     {
-        uint8_t d = (uint8_t)((peakX - liveX + 3) / 4);
+        uint8_t d = (uint8_t)((liveQ - peakQ + 2) / 3);
         if (d == 0)
             d = 1;
-        peakX = (uint8_t)(peakX - d);
+        uint8_t n = (uint8_t)(peakQ + d);
+        peakQ = (n > liveQ) ? liveQ : n;
     }
+    else if (peakQ > liveQ)
+    {
+        uint8_t d = (uint8_t)((peakQ - liveQ + 6) / 7);
+        if (d == 0)
+            d = 1;
+        peakQ = (uint8_t)(peakQ - d);
+    }
+    uint8_t peakX = (uint8_t)(((uint16_t)peakQ * SMETER_PEAK_DEN + (SMETER_PEAK_NUM / 2)) / SMETER_PEAK_NUM);
+    if (peakX > (uint8_t)(barW - SMETER_NEEDLE_W))
+        peakX = (uint8_t)(barW - SMETER_NEEDLE_W);
     uint8_t x0 = (uint8_t)(SMETER_LAB_X + SMETER_LAB_W + SMETER_LAB_GAP);
     static uint8_t prevBarX = 255;
     uint8_t mhzX = (uint8_t)(g_freqRightX + FREQ_MHZ_GAP);
@@ -1256,11 +1284,7 @@ void showSMeter()
                         d0 = side ? 0xFC : 0x04;
                         d1 = side ? 0x3F : 0x20;
                     }
-                    if (col == peakX || col == (uint8_t)(peakX + 1))
-                    {
-                        d0 = 0xFF;
-                        d1 = 0xFF;
-                    }
+                    smApplyNeedle(col, peakX, &d0, &d1);
                     oled.sendData(pg ? d1 : d0);
                     col++;
                 }
@@ -1269,11 +1293,7 @@ void showSMeter()
                     for (uint8_t z = 0; z < SMETER_SEG_GAP; z++)
                     {
                         uint8_t d0 = 0, d1 = 0;
-                        if (col == peakX || col == (uint8_t)(peakX + 1))
-                        {
-                            d0 = 0xFF;
-                            d1 = 0xFF;
-                        }
+                        smApplyNeedle(col, peakX, &d0, &d1);
                         oled.sendData(pg ? d1 : d0);
                         col++;
                     }

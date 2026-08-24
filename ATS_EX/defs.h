@@ -71,6 +71,10 @@
 #define SMETER_LAB_UP 1
 // Deadband on RSSI before S-unit / peak needle may move.
 #define SMETER_HYST_DB 3
+// Peak path 7/4 of bar pixels. Attack (d+2)/3, release (d+6)/7.
+#define SMETER_PEAK_NUM 7
+#define SMETER_PEAK_DEN 4
+#define SMETER_NEEDLE_W 3
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 2000
 #define OVERLAY_FLASH_MS 250
