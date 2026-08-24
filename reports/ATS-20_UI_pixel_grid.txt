@@ -6,8 +6,9 @@ OLED: 128×64, 8 страниц × 8 px.
 page 0–1  idle чипы MODE (лево) и BW (центр). Overlay: TITLE …. [badge]
 page 2–5  7-seg, сдвиг FREQ_SHIFT=4: 4 px под шапкой, 4 px над S-метром
           (страницы 2+3+4+5 = 32 px; глиф 24 px по центру)
-page 6–7  S-meter 16 px: подпись S n[+], 8 кубов 7×12, пик штрихом
-          WFM: 10 px круг после последнего куба (пилот → 2 с lit → heartbeat)
+page 6–7  S-meter 16 px, одно место во всех режимах: подпись S n[+] с x=0,
+          8 кубов с x=24. WFM: 10 px круг после последнего куба (пилот).
+          Частота+MHz: 7 px между 7-seg и MHz, блок по центру.
 
 Нет на idle: VOL, kHz, BFO, STEREO текстом, band-tag, RDS (USE_RDS 0).
 STEP / VOL / BFO / BAND / MODE / BW — overlay, не вторая «статусная» строка.

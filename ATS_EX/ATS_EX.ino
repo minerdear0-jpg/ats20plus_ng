@@ -176,12 +176,6 @@ void setup()
     else
         saveAllReceiverInformation();
 
-    //Clock speed configuration
-    noInterrupts(); //cli()
-    CLKPR = 0x80;   //Allow edit CLKPR register
-    CLKPR = g_Settings[SettingsIndex::CPUSpeed].param;
-    interrupts();   //sei()
-
     //Initialize current band settings and read frequency
     applyBandConfiguration();
     g_currentFrequency = g_previousFrequency = g_si4735.getFrequency();
@@ -348,6 +342,7 @@ void saveAllReceiverInformation()
         EEPROM.update(addr++, g_bandList[i].bandwidthIdx);
     }
 
+    g_Settings[SettingsIndex::CPUSpeed].param = 0;
     for (uint8_t i = 0; i < SettingsIndex::SETTINGS_MAX; i++)
         EEPROM.update(addr++, g_Settings[i].param);
 }
@@ -381,6 +376,7 @@ void readAllReceiverInformation()
 
     for (uint8_t i = 0; i < SettingsIndex::SETTINGS_MAX; i++)
         g_Settings[i].param = EEPROM.read(addr++);
+    g_Settings[SettingsIndex::CPUSpeed].param = 0;
 
     oled.setContrast(uint8_t(g_Settings[SettingsIndex::Brightness].param) * 2);
 
@@ -483,19 +479,20 @@ void showFrequency(bool cleanDisplay = false)
     }
 
     uint8_t nGlyphs = strlen8(line);
-    uint8_t off = (uint8_t)((128 - (uint16_t)nGlyphs * 14) / 2);
+    uint8_t gap = oledFreqGap(nGlyphs);
+    uint8_t pitch = (uint8_t)(FREQ_CELL_W + gap);
+    uint8_t pixW = oledFreqWidth(nGlyphs, gap);
+    bool showMhz = g_bandIndex == FM_BAND_TYPE
+        || (g_bandIndex == SW_BAND_TYPE && g_Settings[SettingsIndex::SWUnits].param == 1 && !isSSB());
+    uint8_t extra = showMhz ? (uint8_t)(FREQ_MHZ_GAP + MHZ_LABEL_W) : 0;
+    uint16_t block = (uint16_t)pixW + extra;
+    if (block > 128)
+        block = 128;
+    uint8_t off = (uint8_t)((128 - block) / 2);
 
     if (cleanDisplay || prevOff != off)
     {
-        oledBlit7segUp2(0, "/////////");
-        oled.setCursor(126, UI_PAGE_FREQ - 1);
-        oled.fillLength(0, 2);
-        oled.setCursor(126, UI_PAGE_FREQ);
-        oled.fillLength(0, 2);
-        oled.setCursor(126, UI_PAGE_FREQ + 1);
-        oled.fillLength(0, 2);
-        oled.setCursor(126, UI_PAGE_FREQ + 2);
-        oled.fillLength(0, 2);
+        oledClear7segBand();
         prevLine[0] = 0;
         prevOff = off;
     }
@@ -516,7 +513,7 @@ void showFrequency(bool cleanDisplay = false)
             rest[n++] = '/';
         rest[n] = 0;
         if (n)
-            oledBlit7segUp2((uint8_t)(off + i * 14), rest);
+            oledBlit7segUp2((uint8_t)(off + i * pitch), rest, gap);
         i = 0;
         do
         {
@@ -524,10 +521,8 @@ void showFrequency(bool cleanDisplay = false)
         } while (line[i++]);
     }
 
-    bool showMhz = g_bandIndex == FM_BAND_TYPE
-        || (g_bandIndex == SW_BAND_TYPE && g_Settings[SettingsIndex::SWUnits].param == 1 && !isSSB());
-    g_freqRightX = (uint8_t)(off + nGlyphs * 14);
-    uint8_t mhzX = (uint8_t)(g_freqRightX + 4);
+    g_freqRightX = (uint8_t)(off + pixW);
+    uint8_t mhzX = (uint8_t)(g_freqRightX + FREQ_MHZ_GAP);
     if (prevMhzX != 255 && (!showMhz || prevMhzX != mhzX))
     {
         oled.setCursor(prevMhzX, UI_PAGE_FREQ + 1);
@@ -538,12 +533,6 @@ void showFrequency(bool cleanDisplay = false)
     if (showMhz)
         oledPrintMhz(mhzX);
     prevMhzX = showMhz ? mhzX : 255;
-    static uint8_t prevRight = 255;
-    if (prevRight != g_freqRightX)
-    {
-        g_sMeterDrawnVal = 255;
-        prevRight = g_freqRightX;
-    }
 
     g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }
@@ -748,21 +737,6 @@ void SettingParamToUI(char* buf, uint8_t idx)
             buf[1] = 'S';
             buf[2] = 'B';
         }
-        else if (idx == SettingsIndex::CPUSpeed)
-        {
-            if (param == 0)
-            {
-                buf[0] = '1';
-                buf[1] = '0';
-                buf[2] = '0';
-            }
-            else
-            {
-                buf[0] = '5';
-                buf[1] = '0';
-                buf[2] = '%';
-            }
-        }
         else
         {
             if (param == 0)
@@ -796,10 +770,10 @@ static const uint8_t kMenuAudio[] = {
     SettingsIndex::SoftMute, SettingsIndex::DeEmp, SettingsIndex::SVC, SettingsIndex::SSM
 };
 static const uint8_t kMenuSys[] = {
-    SettingsIndex::CPUSpeed, SettingsIndex::ScanSwitch, SettingsIndex::CWSwitch, SettingsIndex::CWPitch
+    SettingsIndex::ScanSwitch, SettingsIndex::CWSwitch, SettingsIndex::CWPitch
 };
 static const uint8_t* const kMenuItems[] = { kMenuRadio, kMenuDisp, kMenuAudio, kMenuSys };
-static const uint8_t kMenuCount[] = { 7, 4, 4, 4 };
+static const uint8_t kMenuCount[] = { 7, 4, 4, 3 };
 static const char* const kMenuNames[] = { "RADIO", "DISP", "AUDIO", "SYS" };
 
 static uint8_t menuItemAt(uint8_t sel)
@@ -1156,16 +1130,15 @@ void showSMeter()
         }
     }
     bool dotDirty = (dot != drawnDot);
-    if (val == g_sMeterDrawnVal && smPeak == smDrawnPeak && !dotDirty)
-        return;
 
     uint8_t barW = (uint8_t)(SMETER_CUBES * SMETER_SEG_W + (SMETER_CUBES - 1) * SMETER_SEG_GAP);
-    uint8_t x0 = (g_freqRightX > barW) ? (uint8_t)(g_freqRightX - barW) : SMETER_LAB_W;
-    if (x0 < SMETER_LAB_W)
-        x0 = SMETER_LAB_W;
+    uint8_t x0 = SMETER_LAB_W;
+    static uint8_t prevBarX = 255;
+    if (val == g_sMeterDrawnVal && smPeak == smDrawnPeak && !dotDirty && x0 == prevBarX)
+        return;
 
     g_si4735.setI2CFastModeCustom(I2C_FAST_HZ);
-    if (val != g_sMeterDrawnVal)
+    if (val != g_sMeterDrawnVal || x0 != prevBarX)
     {
         char lab[4];
         lab[0] = 'S';
@@ -1174,13 +1147,13 @@ void showSMeter()
         lab[3] = 0;
         oledPrintSMeterLab(lab, x0);
     }
-    if (val != g_sMeterDrawnVal || smPeak != smDrawnPeak || dotDirty)
+    if (val != g_sMeterDrawnVal || smPeak != smDrawnPeak || dotDirty || x0 != prevBarX)
     {
         // First 7 cubes = S1..S9; last cube = any S9+ (label '+'), not extra +10/+40 cells.
         uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
         uint8_t pk = (smPeak >= 10) ? SMETER_CUBES : (uint8_t)((smPeak * (SMETER_CUBES - 1) + 4) / 9);
         uint8_t tailX = (uint8_t)(x0 + barW);
-        if (g_currentMode == FM)
+        if (g_currentMode == FM && (dot || drawnDot))
             tailX = (uint8_t)(tailX + SMETER_DOT_GAP + SMETER_DOT_W);
         for (uint8_t pg = 0; pg < 2; pg++)
         {
@@ -1249,6 +1222,7 @@ void showSMeter()
         g_sMeterDrawnVal = val;
         smDrawnPeak = smPeak;
         drawnDot = dot;
+        prevBarX = x0;
     }
     g_si4735.setI2CFastModeCustom(I2C_RUN_HZ);
 }
@@ -1406,7 +1380,7 @@ void bandSwitch(bool up)
             updateBFO();
         g_si4735.setFrequency(nextSW);
         agcSetFunc(); //Re-apply to remove noize
-        showFrequency();
+        uiMark(UI_FREQ, true);
     }
     else
     {
@@ -1626,16 +1600,10 @@ void doCutoffFilter(int8_t v)
         updateSSBCutoffFilter();
 }
 
-//Settings: CPU Frequency divider
-void doCPUSpeed(int8_t v = 0)
+// EEPROM slot kept; runtime CLKPR removed (always 16 MHz).
+void doCPUSpeed(int8_t)
 {
-    doSwitchLogic(g_Settings[SettingsIndex::CPUSpeed].param, 0, 1, v);
-
-    noInterrupts();
-    CLKPR = 0x80;
-    CLKPR = g_Settings[SettingsIndex::CPUSpeed].param;
-    interrupts();
-    // CLKPR /2 does not change F_CPU: millis, delayMicroseconds, TWBR all stay 16 MHz calibrated.
+    g_Settings[SettingsIndex::CPUSpeed].param = 0;
 }
 
 void doDisplayOff(int8_t v)

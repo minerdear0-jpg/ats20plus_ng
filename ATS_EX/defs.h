@@ -75,6 +75,9 @@
 // Pages: header 0-1, 7-seg centered in 2-5 (4 px under header, 4 px above S-meter), S-meter 6-7.
 #define UI_PAGE_FREQ 3
 #define FREQ_SHIFT 4
+#define FREQ_CELL_W 14
+#define FREQ_CELL_GAP 2
+#define FREQ_MHZ_GAP 7
 #define UI_PAGE_SECONDARY 6
 #define BADGE_PAD 3
 

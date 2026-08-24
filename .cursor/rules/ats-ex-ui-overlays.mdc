@@ -16,7 +16,7 @@ TITLE ............... [VALUE]
 
 **Font roles**
 
-- **14×24** seven-seg: frequency only (hero). Do not replace with 6×8. Still drawn as 14 px slots; trim widths for `.` / `1` are in `font14x24sevenSeg.h` (`kFreqW`) for a later proportional blit when flash allows.
+- **14×24** seven-seg: frequency only (hero). Do not replace with 6×8. Glyph is 14 px; **2 px gap** between cells (1 px if 8 digits would overflow). Packed `kFreqW` blit is off — unreadable.
 - **8×16** Pixel Operator: idle chips, overlay TITLE / focus, S-meter `S9+` (same 16 px row as the cubes).
 - **Karat 5×7**: MHz, STEREO, small secondary / RDS / service marks. Not the S-meter label — 5×7 cannot fill the 16 px cubes.
 

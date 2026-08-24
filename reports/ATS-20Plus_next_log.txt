@@ -1,12 +1,14 @@
 ATS-20Plus_next — журнал
 
-Срез 2026-08-24: reports/ATS-20Plus_next_2026-08-24.txt (HEAD add367d, flash 32142).
+Срез 2026-08-24: reports/ATS-20Plus_next_2026-08-24.txt.
+HEAD 3715ff6; дерево: CLKPR A + g_uiFreqClean + prop. 7-seg, flash 31982 / SRAM 1271.
 Idle UI на железе ок (зазоры, S9/S9+, стерео-пульс, overlay STEP+клик, шапка vs 7-seg).
-Завтра: CLKPR 50% только как решение (millis/I2C vs F_CPU), не разовый слух; g_uiFreqClean; пропорциональный 7-seg; RADIO ERR.
+CLKPR A: USB залита, слух ок. g_uiFreqClean: uiMark(..., true) на SSB wrap и SW subband.
+Пропорциональный 7-seg: kFreqW blit. Дальше: RADIO ERR.
 
 Ветка: ATS-20Plus_next (локально, без push).
 Baseline прошивки: 4fe59be (build.sh). Дальше: один эксперимент = один commit = один avr-size = один hardware test.
-Железо цели: Arduino Uno, ATmega328P, 32256 flash / 2048 SRAM.
+Железо теста: кремний ATmega328PB (ISP `-p m328pb`, 1E 95 16). USB Optiboot врёт 328P (1E 95 0F, 115200, hfuse 0xDE). Сборка Uno 32256. USB: `./build.sh --fast --upload` → avrdude `-p m328p -c arduino -b 115200`.
 
 I2C (уже архитектура, не план): 100 kHz NORMAL/QUIET; 400 kHz только пакет commitRadioFrequency; патч SSB 500 kHz. История глобальных 400: 965c5d3, снято.
 SSB: deadline 10 ms (`g_rfPendingSince`), не debounce. Фон (S-meter/SQL/RDS/battery) не на крутилке.
@@ -38,7 +40,7 @@ Dirty = dirty-region (page 5), не dirty-pixel; смена val → весь ram
 - g_uiFocus + g_currentCmd + MENU — по-прежнему три измерения.
 - Дублирование doFrequencyTune / TuneSSB дешевле DRY-слоя.
 - RDS-категории в MENU нет. Pong не берём.
-- P0.5 CLKPR 50%: код жив, на железе не проверено.
+- P0.5 CLKPR: вариант A (лидер). Runtime CLKPR снят. Слот CPU в EEPROM оставлен (save 0).
 
 Flash / RAM
 - После MENU (4fe59be): 31678 flash, SRAM 1272.
@@ -46,10 +48,10 @@ Flash / RAM
 - P0–P3 одним проходом кода (не 7 отдельных avr-size). Слух/NACK/CLKPR — hardware.
 
 Дальше
-P0.5 CLKPR 50% на железе (millis, I2C, 10/70/1200 ms).
-Hardware: NACK/CTS timeout, RADIO ERR retry, MODE overlay, battery %, SSB secondary.
+Hardware: NACK/CTS timeout, RADIO ERR retry.
 DROP acceleration, Mini GUI, framebuffer, S-meter pixel-diff.
-g_uiFreqClean: uiMark(..., true) по-прежнему не вызывается.
+g_uiFreqClean: uiMark(UI_FREQ, true) на clampSSBBand и bandSwitch SW.
+Пропорциональный 7-seg: blit kFreqCol0/kFreqW.
 
 Железо
 - Короткий энкодер: STEP→VOL→BFO→MAIN. MENU: rotate список, press войти/править.

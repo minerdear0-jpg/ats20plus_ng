@@ -3,7 +3,6 @@
 #include "radio.h"
 
 void showStatus(bool cleanFreq);
-void showFrequency(bool cleanDisplay);
 void showModulation();
 void resetEepromDelay();
 void updateSSBCutoffFilter();
@@ -220,7 +219,7 @@ bool clampSSBBand()
     {
         g_currentBFO = 0;
         updateBFO();
-        showFrequency(true);
+        uiMark(UI_FREQ, true);
         showModulation();
     };
 

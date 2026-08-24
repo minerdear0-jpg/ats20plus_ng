@@ -77,7 +77,9 @@ P0  waitToSend bounded (~50 ms) + NACK (requestFrom==0). build.sh:
     копия PU2CLR → patch. Happy path: тот же delay 300 us + request.
     si4735OnBusFail → g_radioError. Слух/анализатор — на железе.
 
-P0.5  CLKPR 50% не валидирован. Не удаляли.
+P0.5  CLKPR вариант A (лидер 2026-08-24): всегда 16 МГц, пункт CPU
+    снят из SYS. Слот SettingsIndex::CPUSpeed в EEPROM сохранён (read ignore,
+    write 0). USB залита, слух лидера ок. 50% не гоняли. Flash: 31952.
 
 P1  g_sMeterOn, prev/prevFunc сняты. g_currentCmd uint8_t (+ CMD_MODE).
     avr-size вместе с P2/P3, не отдельно: Flash 31678→31996 (+318),

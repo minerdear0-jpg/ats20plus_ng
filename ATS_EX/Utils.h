@@ -116,7 +116,34 @@ static const uint8_t kKarat5x7[][5] PROGMEM = {
     { 0x08, 0x08, 0x3E, 0x08, 0x08 }
 };
 
-void oledBlit7segUp2(uint8_t x, const char* s)
+void oledClear7segBand()
+{
+    for (uint8_t pg = 0; pg < 4; pg++)
+    {
+        oled.setCursor(0, (uint8_t)(UI_PAGE_FREQ - 1 + pg));
+        oled.fillLength(0, 128);
+    }
+}
+
+uint8_t oledFreqGap(uint8_t n)
+{
+    if (n < 2)
+        return 0;
+    uint16_t w = (uint16_t)n * FREQ_CELL_W + (uint16_t)(n - 1) * FREQ_CELL_GAP;
+    if (w <= 128)
+        return FREQ_CELL_GAP;
+    w = (uint16_t)n * FREQ_CELL_W + (uint16_t)(n - 1);
+    return (w <= 128) ? 1 : 0;
+}
+
+uint8_t oledFreqWidth(uint8_t n, uint8_t gap)
+{
+    if (!n)
+        return 0;
+    return (uint8_t)((uint16_t)n * FREQ_CELL_W + (n > 1 ? (uint16_t)(n - 1) * gap : 0));
+}
+
+void oledBlit7segUp2(uint8_t x, const char* s, uint8_t gap)
 {
     for (uint8_t pg = 0; pg < 4; pg++)
     {
@@ -128,13 +155,18 @@ void oledBlit7segUp2(uint8_t x, const char* s)
             if (c < 46 || c > 57)
                 c = 47;
             uint16_t gi = (uint16_t)(c - 46) * 42;
-            for (uint8_t col = 0; col < 14; col++)
+            for (uint8_t col = 0; col < FREQ_CELL_W; col++)
             {
                 uint32_t g = pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + col]);
                 g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 14 + col]) << 8;
                 g |= (uint32_t)pgm_read_byte(&ssd1306xled_font14x24sevenSeg[gi + 28 + col]) << 16;
                 g <<= FREQ_SHIFT;
                 oled.sendData((uint8_t)(g >> (8 * pg)));
+            }
+            if (gap && s[i + 1])
+            {
+                for (uint8_t z = 0; z < gap; z++)
+                    oled.sendData(0);
             }
         }
         oled.endData();
