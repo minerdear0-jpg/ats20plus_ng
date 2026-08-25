@@ -14,6 +14,7 @@ uint8_t g_uiDirty = 0;
 bool g_uiFreqClean = false;
 uint8_t g_uiLayer = 0;
 uint8_t g_uiFocus = 0;
+bool g_volFromButtons = false;
 
 uint8_t g_sMeterDrawnVal = 255;
 bool g_displayOn = true;

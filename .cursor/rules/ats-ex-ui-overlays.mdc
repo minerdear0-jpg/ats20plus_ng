@@ -17,8 +17,9 @@ TITLE ............... [VALUE]
 **Font roles**
 
 - **Icom-inspired 16×24** VFO digits (3 px stroke, open counters): frequency only (hero). Each digit occupies a **16 px slot** (`kFreqColOffKW` is left bearing in that slot); the decimal is 4 px. **4 px gap** between slots (1 px if 8 glyphs would overflow). Redraw only slots whose character changed — do not slide the whole row when `1` vs `8`. Packed proportional blit is off. Geometry lives in `fonts/vfo_icom_geom.py`.
-- **8×16** Pixel Operator: idle chips, overlay TITLE / focus, S-meter `S9+` (same font as chip labels, shifted up `SMETER_LAB_UP` px into the cube band, 2 px empty top and bottom). Same 16 px row as the cubes. Gap after `+` equals the `+` glyph width (8 px), then cubes.
-- **Karat 5×7**: MHz, STEREO, small secondary / RDS / service marks. Not the S-meter label — 5×7 cannot fill the 16 px cubes.
+- **8×16** Pixel Operator: idle chips, overlay TITLE / focus.
+- **7×14** X11 misc-fixed (U8x8): S-meter chip — thin `S`, bold digit / `+`.
+- **Karat 5×7**: MHz, small secondary / RDS / service marks.
 
 - Title: normal 8×16, left.
 - Leader dots between title and chip.
@@ -28,10 +29,10 @@ TITLE ............... [VALUE]
 
 **Idle chips** (black on filled rounded rect):
 
-- Mode AM/LSB/USB/CW/WFM: top-left. Two-letter labels centered in the chip (`WFM` is three letters).
+- Mode AM/LSB/USB/CW/WFM: top-left. Two-letter labels centered in the chip (`WFM` is three letters). AM/FM mute replaces the mode chip with **MUTE** (same 8×16 inverted chip). VFO and S-meter stay.
 - Filter width: top-center on SW **and** WFM (`AUTO`, `110k`, `3.0k`, CW `0.5k`). Not plain text.
-- WFM stereo: hidden until a stereo pilot. Then an inverted chip **above `MHz`** (same X as Karat MHz, pages 2–3): pictogram `((·))` with inner parens shorter. Stays on while the pilot is present — no blink. Not on the S-meter. `MHz` is 5×7 on the bottom pages of the frequency. Idle mode chip on FM is `WFM`.
-- S-meter peak: **1C frozen** — 3 px sandwich black–white–black (not XOR). White vein on fill. Cubes stay 7 px. Analog attack `(d+2)/3`, viscous release `(d+6)/7`. Do not restore 1A XOR or 1B T-cap without leader GO.
+- WFM stereo: hidden until a stereo pilot. Then a **white pictogram** **above `MHz`** (same X as Karat MHz, pages 2–3): `((·))` with inner parens shorter. **No chip fill.** Stays on while the pilot is present — no blink. Not on the S-meter, not to the right of the scale. `MHz` is 5×7 on the bottom pages of the frequency. Idle mode chip on FM is `WFM`.
+- S-meter: **fleeing-wall rectangles** (accepted). Optical perspective; trapezoid concept only in `fonts/smeter_wall_concept.png`. Widths `3 3 4 5 6 8 10 13`, heights `4 6 6 8 10 12 14 14`, even gaps `2`. Mock: `fonts/smeter_wall_S5.png`. Backup wide-gap: `SMETER_WALL_WIDE_GAP 1` in `defs.h`. Needle `liveX` = right edge of filled steps; analog attack `(d+2)/3` / release `(d+6)/7`. Label chip (`font7x14smeter.h`). No second peak. Do not restore 1A/1B. Do not draw trapezoid slants on OLED — they alias on 16 px. AM/FM FREQOFF: 8 px gap then 11×16 `◀` / STOP / `▶`. After 1 s: STOP if `|off|≤12` FM / `≤1` AM, **2 s then hide**. Off-grid chevrons **blink ~1 Hz**. WFM: chip FREQOFF for ±100 kHz; ±200 kHz uses last STOP lock (chip max ±127 kHz). Chevron vs chip FREQOFF is **inverted** (DUT). Stereo pilot is not on-grid. AFCRL does not hide — railed offset picks the arrow. Not on SSB/CW.
 - BAND overlay FM tag is `WFM`, CB is `CB`. No band tag on idle.
 
 Do not add idle VOL, BRT, kHz on SW, or idle BFO `+    0`. VOL/BFO/BRT only in overlay when adjusting.

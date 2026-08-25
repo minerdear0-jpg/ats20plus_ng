@@ -15,6 +15,7 @@
 #include "oled_bus.h"
 #include "font8x16pob_ui.h"
 #include "font16x24vfoIcom.h"
+#include "font7x14smeter.h"
 #include "Rotary.h"
 #include "SimpleButton.h"
 
@@ -33,6 +34,7 @@ void cycleModePick(int8_t dir);
 void commitModePick();
 void paintModeOrBand();
 void displayPower(bool on);
+void setMuted(bool on);
 
 int getLastStep()
 {
@@ -152,18 +154,9 @@ void setup()
     if (!(PINC & (1 << (ENCODER_BUTTON - 14))))
     {
         saveAllReceiverInformation();
-        oled.print("  EEPROM RESET");
-        oled.setCursor(0, 2);
-        oled.print("----------------");
+        oledPrint("  EEPROM RESET", 0, 0, DEFAULT_FONT);
+        oledPrint("----------------", 0, 2, DEFAULT_FONT);
         delay(960);
-    }
-    else
-    {
-        oledPrint(" ATS-20 RECEIVER", 0, 0, DEFAULT_FONT, true);
-        oledPrint("ATS_EX V" FW_VERSION_STR, 16, 2);
-        oledPrint("(C) OOMAN   2026", 0, 4);
-        oledPrint("(C) CURSOR  2026", 0, 6);
-        delay(2000);
     }
     oled.clear();
 
@@ -200,6 +193,15 @@ uint8_t volumeEvent(uint8_t event, uint8_t pin)
 {
     if (event)
         g_lastInputMs = millis();
+    if (!g_settingsActive && BUTTONEVENT_FIRSTLONGPRESS == event)
+    {
+        if (g_currentCmd != CMD_VOLUME)
+        {
+            g_volFromButtons = true;
+            switchCommand(CMD_VOLUME, showVolume);
+        }
+        g_uiLayer = UI_LAYER_TRANSIENT;
+    }
     if (g_muteVolume)
     {
         if (!BUTTONEVENT_ISDONE(event))
@@ -375,7 +377,8 @@ void readAllReceiverInformation()
 
     for (uint8_t i = 0; i <= g_lastBand; i++)
     {
-        g_bandList[i].currentFreq = (EEPROM.read(addr++) << 8) | EEPROM.read(addr++);
+        g_bandList[i].currentFreq = ((uint16_t)EEPROM.read(addr++) << 8);
+        g_bandList[i].currentFreq |= EEPROM.read(addr++);
         g_bandList[i].currentStepIdx = EEPROM.read(addr++);
         g_bandList[i].bandwidthIdx = EEPROM.read(addr++);
     }
@@ -942,7 +945,7 @@ void paintTransient(const char* title, const char* value)
         oled.setCursor(x, 0);
         while (x + 8 <= badgeX)
         {
-            oled.print(".");
+            oled.write(pobIndex('.'));
             x += 8;
         }
     }
@@ -965,8 +968,11 @@ void paintModeOrBand()
 
 void showModulation()
 {
-    oledPrintModeBadge(g_bandModeDesc[g_currentMode], 0, BADGE_PAD);
-    uint8_t sx = (uint8_t)(oledBadgeWidth(g_bandModeDesc[g_currentMode], BADGE_PAD) + 2);
+    const char* lab = g_bandModeDesc[g_currentMode];
+    if (g_muteVolume && (g_currentMode == FM || g_currentMode == AM))
+        lab = "MUTE";
+    oledPrintModeBadge(lab, 0, BADGE_PAD);
+    uint8_t sx = (uint8_t)(oledBadgeWidth(lab, BADGE_PAD) + 2);
     if (isSSB() && g_Settings[SettingsIndex::Sync].param == 1)
         oledPrint("S", sx, 0, DEFAULT_FONT, true);
     else
@@ -1066,7 +1072,7 @@ void showRDS()
     uint8_t toPrint = len == 0 ? 3 : (len < g_rdsPrevLen ? min(g_rdsPrevLen - len, 16 - len) : 0);
     char printChar = len == 0 ? '.' : ' ';
     for (uint8_t i = 0; i < toPrint; i++) 
-        oled.print(printChar);
+        oled.write(pobIndex((uint8_t)printChar));
 
     g_rdsPrevLen = len;
     g_rdsSwitchPressed = false;
@@ -1122,7 +1128,7 @@ void showStep()
     paintTransient("STEP", buf);
 }
 
-// 1C (chosen): sandwich black-white-black. 1A XOR lost on fill; 1B cap rejected.
+// 1C: sandwich black-white-black. liveX = cube edges (fill map), not S1…+20.
 static void smApplyNeedle(uint8_t col, uint8_t peakX, uint8_t* d0, uint8_t* d1)
 {
     uint8_t i = (uint8_t)(col - peakX);
@@ -1205,16 +1211,76 @@ void showSMeter()
     }
     bool dotDirty = (dot != drawnDot);
 
-    uint8_t barW = (uint8_t)(SMETER_CUBES * SMETER_SEG_W + (SMETER_CUBES - 1) * SMETER_SEG_GAP);
-    // First 7 cubes = S1..S9; last cube = any S9+ (label '+').
-    uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
-    uint8_t liveX = 0;
-    if (cur)
+    uint8_t cue = 0;
+    static uint8_t cueDir = 0;
+    static uint8_t cueHold = 0;
+    static uint32_t cueStopAt = 0;
+    static uint16_t fmLock = 0;
+    if (g_currentMode != FM)
+        fmLock = 0;
+    if (g_processFreqChange)
     {
-        liveX = (uint8_t)(cur * SMETER_SEG_W + (cur - 1) * SMETER_SEG_GAP);
-        if (liveX > (uint8_t)(barW - SMETER_NEEDLE_W))
-            liveX = (uint8_t)(barW - SMETER_NEEDLE_W);
+        cueDir = 0;
+        cueHold = 0;
+        cueStopAt = 0;
     }
+    else if (!isSSB() && (now - g_lastFreqChange) >= FREQOFF_CUE_MS)
+    {
+        int8_t off = (int8_t)g_si4735.getCurrentSignedFrequencyOffset();
+        bool rail = g_si4735.getCurrentAfcRailIndicator();
+        uint8_t dir = 2;
+        int16_t df = 0;
+        uint16_t ad = 0;
+        if (g_currentMode == FM && fmLock)
+        {
+            df = (int16_t)fmLock - (int16_t)g_currentFrequency;
+            ad = (df < 0) ? (uint16_t)(-df) : (uint16_t)df;
+        }
+        if (g_currentMode == FM && ad > 10 && ad <= FREQOFF_FM_LOCK)
+            dir = (df > 0) ? 3 : 1;
+        else
+        {
+            int8_t lim = (g_currentMode == FM) ? (int8_t)FREQOFF_CUE_FM_KHZ : (int8_t)FREQOFF_CUE_KHZ;
+            if (rail)
+                dir = (off < 0) ? 3 : 1;
+            else if (off < -lim)
+                dir = 3;
+            else if (off > lim)
+                dir = 1;
+        }
+        if (dir == cueDir)
+        {
+            if (cueHold < FREQOFF_CUE_HOLD)
+                cueHold++;
+        }
+        else
+        {
+            cueDir = dir;
+            cueHold = 1;
+            cueStopAt = 0;
+        }
+        if (cueHold >= FREQOFF_CUE_HOLD)
+        {
+            if (dir == 2)
+            {
+                if (g_currentMode == FM)
+                    fmLock = g_currentFrequency;
+                if (!cueStopAt)
+                    cueStopAt = now;
+                if ((now - cueStopAt) < FREQOFF_STOP_MS)
+                    cue = 2;
+            }
+            else
+                cue = dir;
+        }
+    }
+    if ((cue == 1 || cue == 3) && !(now & 512u))
+        cue = 0;
+
+    uint8_t barW = smBarW();
+    uint8_t barMax = (uint8_t)(barW - SMETER_NEEDLE_W);
+    uint8_t cur = (val >= 10) ? SMETER_CUBES : (uint8_t)((val * (SMETER_CUBES - 1) + 4) / 9);
+    uint8_t liveX = smBarLiveX(smHystRssi, sUnit, plusDb, cur, barMax);
     uint8_t liveQ = (uint8_t)((uint16_t)liveX * SMETER_PEAK_NUM / SMETER_PEAK_DEN);
     if (g_sMeterDrawnVal == 255)
         peakQ = liveQ;
@@ -1234,10 +1300,11 @@ void showSMeter()
         peakQ = (uint8_t)(peakQ - d);
     }
     uint8_t peakX = (uint8_t)(((uint16_t)peakQ * SMETER_PEAK_DEN + (SMETER_PEAK_NUM / 2)) / SMETER_PEAK_NUM);
-    if (peakX > (uint8_t)(barW - SMETER_NEEDLE_W))
-        peakX = (uint8_t)(barW - SMETER_NEEDLE_W);
+    if (peakX > barMax)
+        peakX = barMax;
     uint8_t x0 = (uint8_t)(SMETER_LAB_X + SMETER_LAB_W + SMETER_LAB_GAP);
     static uint8_t prevBarX = 255;
+    static uint8_t prevCue = 255;
     uint8_t mhzX = (uint8_t)(g_freqRightX + FREQ_MHZ_GAP);
     static uint8_t stereoX = 255;
     g_stereoVis = (g_bandIndex == FM_BAND_TYPE) ? dot : 0;
@@ -1251,7 +1318,7 @@ void showSMeter()
         oledPrintStereoChip(stereoX, false);
         stereoX = 255;
     }
-    if (val == g_sMeterDrawnVal && peakX == smDrawnPeakX && !dotDirty && x0 == prevBarX)
+    if (val == g_sMeterDrawnVal && peakX == smDrawnPeakX && !dotDirty && x0 == prevBarX && cue == prevCue)
     {
         drawnDot = dot;
         return;
@@ -1270,27 +1337,20 @@ void showSMeter()
             for (uint8_t i = 0; i < SMETER_CUBES; i++)
             {
                 bool fill = (i < cur);
-                for (uint8_t w = 0; w < SMETER_SEG_W; w++)
+                uint8_t sw = smSegW(i);
+                for (uint8_t w = 0; w < sw; w++)
                 {
-                    bool side = (w == 0 || w == (uint8_t)(SMETER_SEG_W - 1));
+                    bool side = (w == 0 || w == (uint8_t)(sw - 1));
                     uint8_t d0, d1;
-                    if (fill)
-                    {
-                        d0 = 0xFC;
-                        d1 = 0x3F;
-                    }
-                    else
-                    {
-                        d0 = side ? 0xFC : 0x04;
-                        d1 = side ? 0x3F : 0x20;
-                    }
+                    smHornCol(i, fill, side, &d0, &d1);
                     smApplyNeedle(col, peakX, &d0, &d1);
                     oled.sendData(pg ? d1 : d0);
                     col++;
                 }
                 if (i != SMETER_CUBES - 1)
                 {
-                    for (uint8_t z = 0; z < SMETER_SEG_GAP; z++)
+                    uint8_t gap = smGapAfter(i);
+                    for (uint8_t z = 0; z < gap; z++)
                     {
                         uint8_t d0 = 0, d1 = 0;
                         smApplyNeedle(col, peakX, &d0, &d1);
@@ -1299,13 +1359,23 @@ void showSMeter()
                     }
                 }
             }
-            oled.repeatData(0, (uint8_t)(128 - tailX));
+            oled.repeatData(0, FREQOFF_CUE_GAP);
+            if (cue)
+            {
+                uint8_t gi = (uint8_t)(cue - 1);
+                for (uint8_t x = 0; x < FREQOFF_CUE_W; x++)
+                    oled.sendData(pgm_read_byte(&kFreqOffCue[gi][(uint8_t)(pg * FREQOFF_CUE_W + x)]));
+            }
+            else
+                oled.repeatData(0, FREQOFF_CUE_W);
+            oled.repeatData(0, (uint8_t)(128 - (tailX + FREQOFF_CUE_GAP + FREQOFF_CUE_W)));
             oled.endData();
         }
         g_sMeterDrawnVal = val;
         smDrawnPeakX = peakX;
         drawnDot = dot;
         prevBarX = x0;
+        prevCue = cue;
     }
 }
 
@@ -1378,6 +1448,7 @@ void cycleEncoderFocus()
         next = FOCUS_FREQ;
 
     g_currentCmd = CMD_NONE;
+    g_volFromButtons = false;
     restoreIdleHeader();
     g_uiFocus = next;
     showStep();
@@ -1398,6 +1469,7 @@ void cycleEncoderFocus()
     }
     else if (next == FOCUS_VOL)
     {
+        g_volFromButtons = false;
         g_uiLayer = UI_LAYER_FOCUS;
         g_currentCmd = CMD_VOLUME;
         showVolume();
@@ -1546,15 +1618,32 @@ void doStep(int8_t v)
     }
 }
 
-//Volume control
-void doVolume(int8_t v)
+void setMuted(bool on)
 {
-    if (g_muteVolume)
+    if (on == (g_muteVolume != 0))
+        return;
+    if (on)
+    {
+        uint8_t vol = g_si4735.getCurrentVolume();
+        if (!vol)
+            return;
+        g_muteVolume = vol;
+        g_si4735.setVolume(0);
+    }
+    else
     {
         g_si4735.setVolume(g_muteVolume);
         g_muteVolume = 0;
         applySquelchNow();
     }
+    if (!g_settingsActive)
+        showStatus(true);
+}
+
+void doVolume(int8_t v)
+{
+    if (g_muteVolume)
+        setMuted(false);
     else
     {
         uint8_t steps = (v > 0) ? v : -v;
@@ -1566,7 +1655,11 @@ void doVolume(int8_t v)
                 g_si4735.volumeDown();
         }
     }
-    showVolume();
+    if (g_currentCmd == CMD_VOLUME)
+    {
+        g_lastAdjustmentTime = millis();
+        showVolume();
+    }
 }
 
 //Helps to save more flash image size
@@ -1817,6 +1910,7 @@ void switchCommand(uint8_t cmd, void (*showFunction)())
     {
         g_currentCmd = CMD_NONE;
         g_lastAdjustmentTime = 0;
+        g_volFromButtons = false;
         g_uiFocus = FOCUS_FREQ;
         restoreIdleHeader();
         showStep();
@@ -1977,7 +2071,8 @@ void loop()
         }
         g_lastInputMs = millis();
 
-        if (g_lastAdjustmentTime != 0)
+        if (g_lastAdjustmentTime != 0
+            && !(g_currentCmd == CMD_VOLUME && g_volFromButtons))
             g_lastAdjustmentTime = millis();
 
         if (g_settingsActive)
@@ -2012,7 +2107,7 @@ void loop()
         }
         else if (g_radioError)
             ;
-        else if (g_currentCmd == CMD_VOLUME)
+        else if (g_currentCmd == CMD_VOLUME && !g_volFromButtons)
         {
             g_uiLayer = UI_LAYER_TRANSIENT;
             doVolume(g_encoderCount);
@@ -2151,26 +2246,15 @@ void loop()
     if (BUTTONEVENT_SHORTPRESS == btn_VolumeUp.checkEvent(volumeEvent))
     {
         if (!g_settingsActive && g_muteVolume == 0)
+        {
+            g_volFromButtons = true;
             switchCommand(CMD_VOLUME, showVolume);
+        }
     }
     if (BUTTONEVENT_SHORTPRESS == btn_VolumeDn.checkEvent(volumeEvent))
     {
         if (g_currentCmd != CMD_VOLUME)
-        {
-            uint8_t vol = g_si4735.getCurrentVolume();
-            if (vol > 0 && g_muteVolume == 0)
-            {
-                g_muteVolume = vol;
-                g_si4735.setVolume(0);
-            }
-            else if (g_muteVolume > 0)
-            {
-                g_si4735.setVolume(g_muteVolume);
-                g_muteVolume = 0;
-                applySquelchNow();
-            }
-            showVolume();
-        }
+            setMuted(g_muteVolume == 0);
     }
     uint8_t encEvent = btn_Encoder.checkEvent(simpleEvent);
     if (BUTTONEVENT_SHORTPRESS == encEvent)
@@ -2202,6 +2286,8 @@ void loop()
                 commitModePick();
             switchCommand();
         }
+        else if (g_currentMode == FM || g_currentMode == AM)
+            setMuted(g_muteVolume == 0);
         else
             cycleEncoderFocus();
     }
@@ -2210,7 +2296,12 @@ void loop()
         if (g_settingsActive)
             menuBack();
         else if (g_currentMode == FM || g_currentMode == AM)
-            doSeek();
+        {
+            if (g_muteVolume)
+                setMuted(false);
+            else
+                doSeek();
+        }
         else
         {
             switchCommand();

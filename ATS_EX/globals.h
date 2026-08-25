@@ -45,6 +45,7 @@ extern uint8_t g_uiDirty;
 extern bool g_uiFreqClean;
 extern uint8_t g_uiLayer;
 extern uint8_t g_uiFocus;
+extern bool g_volFromButtons;
 
 enum UiFocus : uint8_t
 {

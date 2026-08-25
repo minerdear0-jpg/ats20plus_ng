@@ -63,18 +63,28 @@
 #define SMETER_MAX_OVER_S9 60
 #define SMETER_LEVELS 16
 #define SMETER_CUBES 8
-#define SMETER_SEG_W 7
-#define SMETER_SEG_GAP 3
-#define SMETER_LAB_X 3
-#define SMETER_LAB_W 24
-#define SMETER_LAB_GAP 7
+// 0 = fleeing-wall rects (even gaps). 1 = backup: wide gap after ~S5.
+#define SMETER_WALL_WIDE_GAP 0
+// Segment W/H/gaps: PROGMEM in Utils.h.
+#define SMETER_LAB_X 0
+#define SMETER_LAB_W 28
+#define SMETER_LAB_GAP 3
+#define SMETER_S_GAP 3
 #define SMETER_LAB_UP 1
-// Deadband on RSSI before S-unit / peak needle may move.
+// Deadband on RSSI before S-unit / needle may move.
 #define SMETER_HYST_DB 3
-// Peak path 7/4 of bar pixels. Attack (d+2)/3, release (d+6)/7.
+// Needle path 7/4 of bar pixels. Attack (d+2)/3, release (d+6)/7.
 #define SMETER_PEAK_NUM 7
 #define SMETER_PEAK_DEN 4
 #define SMETER_NEEDLE_W 3
+#define FREQOFF_CUE_MS 1000
+#define FREQOFF_CUE_KHZ 1
+#define FREQOFF_CUE_FM_KHZ 12
+#define FREQOFF_CUE_W 11
+#define FREQOFF_CUE_GAP 8
+#define FREQOFF_CUE_HOLD 5
+#define FREQOFF_STOP_MS 2000
+#define FREQOFF_FM_LOCK 20
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 2000
 #define OVERLAY_FLASH_MS 250

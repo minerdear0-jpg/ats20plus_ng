@@ -396,3 +396,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Nested olikraus/u8g2 clone (~500 MB). Runtime uses ATS_EX/font7x14smeter.h.
+u8g2/

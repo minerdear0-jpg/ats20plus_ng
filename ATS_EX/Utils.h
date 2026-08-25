@@ -33,7 +33,7 @@ uint8_t oledBadgeWidth(const char* text, uint8_t sidePad = 0)
     return (uint8_t)(vis * 8 + 2 * sidePad);
 }
 
-void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, uint8_t visForce = 0, bool filled = true)
+void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, uint8_t visForce = 0, bool filled = true, uint8_t page0 = 0)
 {
     const DCfont* f = DEFAULT_FONT;
     uint8_t skip = 0;
@@ -53,7 +53,7 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, u
 
     for (uint8_t page = 0; page < 2; page++)
     {
-        oled.setCursor(x0, page);
+        oled.setCursor(x0, page0 + page);
         oled.startData();
         for (uint8_t x = 0; x < boxW; x++)
         {
@@ -86,9 +86,7 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, u
                 uint8_t ci = (uint8_t)((x - pad) / 8);
                 uint8_t col = (uint8_t)((x - pad) % 8);
                 uint8_t c = (uint8_t)text[skip + ci];
-                if (c < f->first || c > f->last)
-                    c = ' ';
-                uint16_t off = (uint16_t)(c - f->first) * 16 + (uint16_t)page * 8;
+                uint16_t off = (uint16_t)pobIndex(c) * 16 + (uint16_t)page * 8;
                 uint8_t g = pgm_read_byte(&f->bitmap[off + col]);
                 b = filled ? (uint8_t)~g : g;
             }
@@ -216,7 +214,7 @@ void oledPrintMhz(uint8_t x0)
     }
 }
 
-// Inverted chip above MHz (pages 2–3). Glyph: outer parens 9 px, inner 5 px, 3×3 dot.
+// Pictogram above MHz (pages 2–3), no chip fill. Outer parens 9 px, inner 5 px, 3×3 dot.
 void oledPrintStereoChip(uint8_t x0, bool on)
 {
     static const uint16_t kStereo[] PROGMEM = {
@@ -240,6 +238,35 @@ void oledPrintStereoChip(uint8_t x0, bool on)
                 oled.sendData(0);
                 continue;
             }
+            uint16_t g = pgm_read_word(&kStereo[x]);
+            uint8_t ink = page ? (uint8_t)(g >> 8) : (uint8_t)g;
+            oled.sendData(ink);
+        }
+        oled.endData();
+    }
+}
+
+void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
+{
+    static uint8_t prevU = 255;
+    static uint8_t prevP = 255;
+    uint8_t p = plus ? 1 : 0;
+    if (!forceS && sUnit == prevU && p == prevP)
+        return;
+    uint8_t gw = SMETER_7X14_W;
+    uint8_t gap = SMETER_S_GAP;
+    uint8_t inner = (uint8_t)(gw + gap + gw + gw);
+    uint8_t boxW = (uint8_t)(inner + 2 * BADGE_PAD);
+    uint8_t pad = BADGE_PAD;
+    uint8_t x0 = SMETER_LAB_X;
+    uint8_t dGi = sUnit;
+    uint8_t pGi = plus ? SMETER_7X14_PLUS : SMETER_7X14_SPC;
+    for (uint8_t page = 0; page < 2; page++)
+    {
+        oled.setCursor(x0, UI_PAGE_SECONDARY + page);
+        oled.startData();
+        for (uint8_t x = 0; x < boxW; x++)
+        {
             uint8_t d = x;
             if ((uint8_t)(boxW - 1 - x) < d)
                 d = (uint8_t)(boxW - 1 - x);
@@ -262,71 +289,139 @@ void oledPrintStereoChip(uint8_t x0, bool on)
                 else if (d == 2)
                     mask = 0x7F;
             }
-            uint16_t g = pgm_read_word(&kStereo[x]);
-            uint8_t ink = page ? (uint8_t)(g >> 8) : (uint8_t)g;
-            oled.sendData((uint8_t)((0xFF ^ ink) & mask));
-        }
-        oled.endData();
-    }
-}
-
-void oledBlitSMeterGlyph(uint8_t x, char c)
-{
-    const DCfont* f = DEFAULT_FONT;
-    if (c < f->first || c > f->last)
-        c = ' ';
-    uint16_t base = (uint16_t)(c - f->first) * 16;
-    uint16_t col[8];
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        uint8_t lo = pgm_read_byte(&f->bitmap[base + i]);
-        uint8_t hi = pgm_read_byte(&f->bitmap[base + 8 + i]);
-        col[i] = ((uint16_t)lo | ((uint16_t)hi << 8)) >> SMETER_LAB_UP;
-    }
-    for (uint8_t page = 0; page < 2; page++)
-    {
-        oled.setCursor(x, UI_PAGE_SECONDARY + page);
-        oled.startData();
-        uint8_t mask = page ? 0x3F : 0xFC;
-        for (uint8_t i = 0; i < 8; i++)
-            oled.sendData((uint8_t)((page ? (col[i] >> 8) : col[i]) & mask));
-        oled.endData();
-    }
-}
-
-void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
-{
-    static uint8_t prevU = 255;
-    static uint8_t prevP = 255;
-    if (forceS || prevU == 255)
-    {
-        if (SMETER_LAB_X)
-        {
-            for (uint8_t page = 0; page < 2; page++)
+            uint8_t b = 0xFF;
+            if (x >= pad && x < pad + inner)
             {
-                oled.setCursor(0, UI_PAGE_SECONDARY + page);
-                oled.startData();
-                for (uint8_t z = 0; z < SMETER_LAB_X; z++)
-                    oled.sendData(0);
-                oled.endData();
+                uint8_t lx = (uint8_t)(x - pad);
+                uint8_t gi = 255;
+                uint8_t col = 0;
+                if (lx < gw)
+                {
+                    gi = SMETER_7X14_S;
+                    col = lx;
+                }
+                else if (lx >= (uint8_t)(gw + gap) && lx < (uint8_t)(gw + gap + gw))
+                {
+                    gi = dGi;
+                    col = (uint8_t)(lx - gw - gap);
+                }
+                else if (lx >= (uint8_t)(gw + gap + gw))
+                {
+                    gi = pGi;
+                    col = (uint8_t)(lx - gw - gap - gw);
+                }
+                if (gi != 255)
+                {
+                    uint16_t off = (uint16_t)gi * SMETER_7X14_BYTES
+                        + (uint16_t)page * gw + col;
+                    uint8_t g = pgm_read_byte(&ssd1306xled_font7x14smeter[off]);
+                    b = (uint8_t)~g;
+                }
             }
+            oled.sendData(b & mask);
         }
-        oledBlitSMeterGlyph(SMETER_LAB_X, 'S');
-        prevU = 255;
-        prevP = 255;
+        oled.endData();
     }
-    if (forceS || sUnit != prevU)
+    prevU = sUnit;
+    prevP = p;
+}
+
+// Fleeing-wall: rectangles sized to read as perspective (concept trapezoids stay in fonts/).
+// SMETER_WALL_WIDE_GAP 1 restores the wide-break car-radio backup.
+#if SMETER_WALL_WIDE_GAP
+static const uint8_t kSmW[] PROGMEM = { 4, 5, 5, 6, 7, 8, 10, 12 };
+static const uint8_t kSmGap[] PROGMEM = { 2, 2, 2, 2, 6, 3, 3 };
+static const uint8_t kF0[] PROGMEM = { 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFC, 0xFE, 0xFE };
+static const uint8_t kF1[] PROGMEM = { 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x3F, 0x7F, 0x7F };
+static const uint8_t kO0[] PROGMEM = { 0x40, 0x20, 0x10, 0x08, 0x04, 0x04, 0x02, 0x02 };
+static const uint8_t kO1[] PROGMEM = { 0x02, 0x04, 0x08, 0x10, 0x20, 0x20, 0x40, 0x40 };
+#else
+static const uint8_t kSmW[] PROGMEM = { 3, 3, 4, 5, 6, 8, 10, 13 };
+static const uint8_t kSmGap[] PROGMEM = { 2, 2, 2, 2, 2, 2, 2 };
+static const uint8_t kF0[] PROGMEM = { 0xC0, 0xE0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFE };
+static const uint8_t kF1[] PROGMEM = { 0x03, 0x07, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0x7F };
+static const uint8_t kO0[] PROGMEM = { 0x40, 0x20, 0x20, 0x10, 0x08, 0x04, 0x02, 0x02 };
+static const uint8_t kO1[] PROGMEM = { 0x02, 0x04, 0x04, 0x08, 0x10, 0x20, 0x40, 0x40 };
+#endif
+
+static uint8_t smSegW(uint8_t i)
+{
+    return pgm_read_byte(&kSmW[i]);
+}
+
+static uint8_t smGapAfter(uint8_t i)
+{
+    return pgm_read_byte(&kSmGap[i]);
+}
+
+static uint8_t smBarW(void)
+{
+    uint8_t w = 0;
+    for (uint8_t i = 0; i < SMETER_CUBES; i++)
     {
-        oledBlitSMeterGlyph((uint8_t)(SMETER_LAB_X + 8), (char)('0' + sUnit));
-        prevU = sUnit;
+        w = (uint8_t)(w + smSegW(i));
+        if (i != SMETER_CUBES - 1)
+            w = (uint8_t)(w + smGapAfter(i));
     }
-    uint8_t p = plus ? 1 : 0;
-    if (forceS || p != prevP)
+    return w;
+}
+
+static uint8_t smCubeEdge(uint8_t cur)
+{
+    if (!cur)
+        return 0;
+    uint8_t x = 0;
+    for (uint8_t i = 0; i < cur; i++)
     {
-        oledBlitSMeterGlyph((uint8_t)(SMETER_LAB_X + 16), plus ? '+' : ' ');
-        prevP = p;
+        x = (uint8_t)(x + smSegW(i));
+        if (i != (uint8_t)(cur - 1))
+            x = (uint8_t)(x + smGapAfter(i));
+    }
+    return x;
+}
+
+static void smHornCol(uint8_t i, bool fill, bool side, uint8_t* d0, uint8_t* d1)
+{
+    if (fill || side)
+    {
+        *d0 = pgm_read_byte(&kF0[i]);
+        *d1 = pgm_read_byte(&kF1[i]);
+    }
+    else
+    {
+        *d0 = pgm_read_byte(&kO0[i]);
+        *d1 = pgm_read_byte(&kO1[i]);
     }
 }
+
+// Needle on the cube scale: at the right edge of `cur`, crawling toward the next cube inside the 6 dB S-step.
+static uint8_t smBarLiveX(uint8_t rssi, uint8_t sUnit, uint8_t plusDb, uint8_t cur, uint8_t barMax)
+{
+    uint8_t e0 = smCubeEdge(cur);
+    if (e0 > barMax)
+        e0 = barMax;
+    if (plusDb || cur >= SMETER_CUBES)
+        return barMax;
+    uint8_t e1 = smCubeEdge((uint8_t)(cur + 1));
+    if (e1 > barMax)
+        e1 = barMax;
+    int16_t lo = (int16_t)sUnit * 6 - 20;
+    if (lo < 0)
+        lo = 0;
+    int16_t t = (int16_t)rssi - lo;
+    if (t < 0)
+        t = 0;
+    if (t > 5)
+        t = 5;
+    return (uint8_t)(e0 + (uint16_t)(e1 - e0) * (uint8_t)t / 6);
+}
+
+// FREQOFF cue: ui freqoff_cue_{left,stop,right}.png, 11×16, page-major.
+static const uint8_t kFreqOffCue[3][22] PROGMEM = {
+    { 0x80, 0xC0, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFC, 0xFE, 0xFF, 0xFF, 0x01, 0x03, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x3F, 0x7F, 0xFF, 0xFF },
+    { 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0x00, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x00 },
+    { 0xFF, 0xFF, 0xFE, 0xFC, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0xC0, 0x80, 0xFF, 0xFF, 0x7F, 0x3F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x03, 0x01 }
+};
 
 void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)
 {
@@ -335,7 +430,13 @@ void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* fon
         oled.invertOutput(invert);
     if (offX >= 0 && offY >= 0)
         oled.setCursor(offX, offY);
-    oled.print(text);
+    if (font == FONT8X16POB_UI)
+    {
+        while (*text)
+            oled.write(pobIndex((uint8_t)*text++));
+    }
+    else
+        oled.print(text);
     if (invert)
         oled.invertOutput(false);
 }

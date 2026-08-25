@@ -321,9 +321,10 @@ void servicePendingTune()
 {
     if (g_radioError || !g_processFreqChange)
         return;
-    uint32_t t0 = isSSB() ? g_rfPendingSince : g_lastFreqChange;
+    // Burst start, not last tick: last-tick wait never elapses while spinning,
+    // so AM/FM left the chip (and S-meter RSSI) on the pre-spin frequency.
     uint16_t wait = isSSB() ? (uint16_t)RF_COMMIT_MS : (uint16_t)FREQ_COMMIT_MS;
-    if ((millis() - t0) >= wait)
+    if ((millis() - g_rfPendingSince) >= wait)
         commitRadioFrequency();
 }
 
