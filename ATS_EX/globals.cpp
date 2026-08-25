@@ -17,6 +17,8 @@ uint8_t g_uiFocus = 0;
 bool g_volFromButtons = false;
 
 uint8_t g_sMeterDrawnVal = 255;
+uint8_t g_auxInd = AUX_IND_AUTO;
+uint8_t g_auxIndSnr = 0;
 bool g_displayOn = true;
 bool g_displayRDS = false;
 bool g_rdsSwitchPressed = false;

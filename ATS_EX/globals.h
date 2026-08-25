@@ -20,7 +20,8 @@ enum UiCmd : uint8_t
     CMD_BW,
     CMD_BAND,
     CMD_MODE,
-    CMD_BRIGHT
+    CMD_BRIGHT,
+    CMD_RADIO
 };
 extern uint8_t g_currentCmd;
 extern bool g_settingsActive;
@@ -62,6 +63,10 @@ inline void uiMark(uint8_t bits, bool freqClean = false)
         g_uiFreqClean = true;
 }
 extern uint8_t g_sMeterDrawnVal;
+// Universal indicator mux: AUX_IND_AUTO → showSMeter maps FREQOFF cue; else force kind.
+// AUX_IND_SNR uses g_auxIndSnr (0..99, 7×14 digits like S-lab).
+extern uint8_t g_auxInd;
+extern uint8_t g_auxIndSnr;
 extern bool g_displayOn;
 extern bool g_displayRDS;
 extern bool g_rdsSwitchPressed;

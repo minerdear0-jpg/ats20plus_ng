@@ -35,6 +35,7 @@ void commitModePick();
 void paintModeOrBand();
 void displayPower(bool on);
 void setMuted(bool on);
+void showRadio();
 
 int getLastStep()
 {
@@ -57,6 +58,50 @@ static uint8_t g_modePick = AM;
 static char g_ovTitle[5];
 static char g_ovVal[8];
 static uint8_t g_ovX, g_ovW, g_ovVisForce, g_ovFill;
+static uint8_t g_tunedDrawn;
+static uint8_t g_radioSlot;
+// One-line cave (ex RADIO/DISP/AUDIO/SYS). Masks: AM=1 LSB=2 USB=4 CW=8 FM=16.
+static const uint8_t kRadioRing[] = {
+    SettingsIndex::ATT,
+    SettingsIndex::ANB,
+    SettingsIndex::SQL,
+    SettingsIndex::Sync,
+    SettingsIndex::CutoffFilter,
+    SettingsIndex::AutoVolControl,
+    SettingsIndex::SoftMute,
+    SettingsIndex::DeEmp,
+    SettingsIndex::SVC,
+    SettingsIndex::SSM,
+    SettingsIndex::Brightness,
+    SettingsIndex::DisplayOff,
+    SettingsIndex::SWUnits,
+    SettingsIndex::UnitsSwitch,
+    SettingsIndex::BFO,
+    SettingsIndex::ScanSwitch,
+    SettingsIndex::CWSwitch,
+    SettingsIndex::CWPitch
+};
+static const uint8_t kRadioMask[] PROGMEM = {
+    0x0F, 0x0F, 0x01, 0x0E, 0x0E, 0x0F,
+    0x0F, 0x10, 0x0E, 0x0E,
+    0x1F, 0x1F, 0x0F, 0x1F,
+    0x1F, 0x1F, 0x0F, 0x08
+};
+enum { kRadioN = 18 };
+
+uint8_t radioNextSlot(uint8_t from)
+{
+    uint8_t s = from;
+    uint8_t m = (uint8_t)(1u << g_currentMode);
+    for (uint8_t i = 0; i < kRadioN; i++)
+    {
+        if (++s >= kRadioN)
+            s = 0;
+        if (pgm_read_byte(&kRadioMask[s]) & m)
+            return s;
+    }
+    return 255;
+}
 
 //Initialize controller
 // Replace Arduino wiring_digital / wiring_analog — PWM-aware tables never used here.
@@ -246,6 +291,14 @@ uint8_t simpleEvent(uint8_t event, uint8_t pin)
         g_lastInputMs = millis();
     if (BUTTONEVENT_FIRSTLONGPRESS == event)
         event = BUTTONEVENT_SHORTPRESS;
+    return event;
+}
+
+// MODE: keep FIRSTLONGPRESS (RADIO ring). Do not remap via simpleEvent.
+uint8_t modeBtnEvent(uint8_t event, uint8_t pin)
+{
+    if (event)
+        g_lastInputMs = millis();
     return event;
 }
 
@@ -618,268 +671,145 @@ void updateLowerDisplayLine()
         showSMeter();
 }
 
-//Converts settings value to UI value
-void SettingParamToUI(char* buf, uint8_t idx)
+void radioValueToUI(char* buf, uint8_t idx)
 {
-    int8_t param = g_Settings[idx].param;
-    switch (g_Settings[idx].type)
+    int8_t p = g_Settings[idx].param;
+    uint8_t t = g_Settings[idx].type;
+    if (idx == SettingsIndex::DisplayOff)
     {
-    case SettingType::ZeroAuto:
-        if (param == 0)
-        {
-            buf[0] = 'A';
-            buf[1] = 'U';
-            buf[2] = 'T';
-            buf[3] = 0x0;
-        }
-        else
-            convertToChar(buf, param, 3);
-
-        break;
-
-    case SettingType::Num:
-        if (idx == SettingsIndex::DisplayOff)
-        {
-            if (param <= 0)
-            {
-                buf[0] = 'O';
-                buf[1] = 'F';
-                buf[2] = 'F';
-            }
-            else if (param == 1)
-            {
-                buf[0] = '1';
-                buf[1] = '5';
-                buf[2] = 'S';
-            }
-            else if (param == 2)
-            {
-                buf[0] = '3';
-                buf[1] = '0';
-                buf[2] = 'S';
-            }
-            else if (param == 3)
-            {
-                buf[0] = '6';
-                buf[1] = '0';
-                buf[2] = 'S';
-            }
-            else
-            {
-                buf[0] = '2';
-                buf[1] = 'M';
-                buf[2] = ' ';
-            }
-            buf[3] = 0;
-            break;
-        }
-        if (idx == SettingsIndex::CWPitch)
-        {
-            buf[0] = '0' + param;
-            buf[1] = '0';
-            buf[2] = '0';
-            buf[3] = 0;
-            break;
-        }
-        convertToChar(buf, abs(param), 3);
-        if (param < 0)
-            buf[0] = '-';
-        break;
-
-    case SettingType::SwitchAuto:
-        if (param == 0)
-        {
-            buf[0] = 'A';
-            buf[1] = 'U';
-            buf[2] = 'T';       }
-        else if (param == 1)
-        {
-            buf[0] = 'O';
-            buf[1] = 'N';
-            buf[2] = ' ';
-        }
-        else
+        if (p <= 0)
         {
             buf[0] = 'O';
             buf[1] = 'F';
             buf[2] = 'F';
         }
-        buf[3] = 0x0;
-        break;
-
-    case SettingType::Switch:
-        if (idx == SettingsIndex::DeEmp)
+        else if (p == 1)
         {
-            if (param == 0)
-            {
-                buf[0] = '5';
-                buf[1] = '0';
-                buf[2] = 'U';
-            }
-            else
-            {
-                buf[0] = '7';
-                buf[1] = '5';
-                buf[2] = 'U';
-            }
+            buf[0] = '1';
+            buf[1] = '5';
+            buf[2] = 'S';
         }
-        else if (idx == SettingsIndex::SWUnits)
+        else if (p == 2)
         {
-            if (param == 0)
-                buf[0] = 'K';
-            else
-                buf[0] = 'M';
-            buf[1] = 'H';
-            buf[2] = 'Z';
+            buf[0] = '3';
+            buf[1] = '0';
+            buf[2] = 'S';
         }
-        else if (idx == SettingsIndex::SSM)
+        else if (p == 3)
         {
-            if (param == 0)
-            {
-                buf[0] = 'R';
-                buf[1] = 'S';
-                buf[2] = 'S';
-            }
-            else
-            {
-                buf[0] = 'S';
-                buf[1] = 'N';
-                buf[2] = 'R';
-            }
-        }
-        else if (idx == SettingsIndex::CWSwitch)
-        {
-            if (param == 0)
-                buf[0] = 'L';
-            else
-                buf[0] = 'U';
-
-            buf[1] = 'S';
-            buf[2] = 'B';
+            buf[0] = '6';
+            buf[1] = '0';
+            buf[2] = 'S';
         }
         else
         {
-            if (param == 0)
-            {
-                buf[0] = 'O';
-                buf[1] = 'F';
-                buf[2] = 'F';
-            }
-            else
-            {
-                buf[0] = 'O';
-                buf[1] = 'N';
-                buf[2] = ' ';
-            }
+            buf[0] = '2';
+            buf[1] = 'M';
+            buf[2] = ' ';
         }
-        buf[3] = 0x0;
-        break;
-    }
-}
-
-enum { MENU_CATS = 4, MENU_ROWS = 3 };
-
-static const uint8_t kMenuRadio[] = {
-    SettingsIndex::ATT, SettingsIndex::Sync, SettingsIndex::AutoVolControl,
-    SettingsIndex::CutoffFilter, SettingsIndex::ANB, SettingsIndex::SQL, SettingsIndex::BFO
-};
-static const uint8_t kMenuDisp[] = {
-    SettingsIndex::Brightness, SettingsIndex::DisplayOff, SettingsIndex::SWUnits, SettingsIndex::UnitsSwitch
-};
-static const uint8_t kMenuAudio[] = {
-    SettingsIndex::SoftMute, SettingsIndex::DeEmp, SettingsIndex::SVC, SettingsIndex::SSM
-};
-static const uint8_t kMenuSys[] = {
-    SettingsIndex::ScanSwitch, SettingsIndex::CWSwitch, SettingsIndex::CWPitch
-};
-static const uint8_t* const kMenuItems[] = { kMenuRadio, kMenuDisp, kMenuAudio, kMenuSys };
-static const uint8_t kMenuCount[] = { 7, 4, 4, 3 };
-static const char* const kMenuNames[] = { "RADIO", "DISP", "AUDIO", "SYS" };
-
-static uint8_t menuItemAt(uint8_t sel)
-{
-    return kMenuItems[g_menuCat][sel];
-}
-
-static uint8_t menuScrollTop()
-{
-    uint8_t n = kMenuCount[g_menuCat];
-    uint8_t sel = (uint8_t)g_SettingSelected;
-    if (n <= MENU_ROWS || sel < MENU_ROWS)
-        return 0;
-    uint8_t s = sel - (MENU_ROWS - 1);
-    if (s + MENU_ROWS > n)
-        s = n - MENU_ROWS;
-    return s;
-}
-
-void DrawSetting(uint8_t idx, uint8_t row, bool full)
-{
-    if (!g_settingsActive)
-        return;
-
-    char buf[5];
-    uint8_t y = 2 + row * 2;
-    if (full)
-        oledPrint(g_Settings[idx].name, 0, y, DEFAULT_FONT, idx == menuItemAt((uint8_t)g_SettingSelected) && !g_SettingEditing);
-    SettingParamToUI(buf, idx);
-    oledPrint(buf, 72, y, DEFAULT_FONT, idx == menuItemAt((uint8_t)g_SettingSelected) && g_SettingEditing);
-}
-
-void showMenu()
-{
-    oled.clear();
-    if (g_menuLevel == 1)
-    {
-        for (uint8_t i = 0; i < MENU_CATS; i++)
-            oledPrint(kMenuNames[i], 0, i * 2, DEFAULT_FONT, i == (uint8_t)g_SettingSelected);
+        buf[3] = 0;
         return;
     }
-
-    oledPrint(kMenuNames[g_menuCat], 0, 0, DEFAULT_FONT, true);
-    uint8_t n = kMenuCount[g_menuCat];
-    uint8_t top = menuScrollTop();
-    for (uint8_t r = 0; r < MENU_ROWS && (top + r) < n; r++)
-        DrawSetting(menuItemAt(top + r), r, true);
-}
-
-void menuBack()
-{
-    if (g_SettingEditing)
+    if (idx == SettingsIndex::DeEmp)
     {
-        g_SettingEditing = false;
-        showMenu();
+        if (p == 0)
+        {
+            buf[0] = '5';
+            buf[1] = '0';
+        }
+        else
+        {
+            buf[0] = '7';
+            buf[1] = '5';
+        }
+        buf[2] = 'U';
+        buf[3] = 0;
         return;
     }
-    if (g_menuLevel == 2)
+    if (idx == SettingsIndex::SWUnits)
     {
-        g_menuLevel = 1;
-        g_SettingSelected = g_menuCat;
-        showMenu();
+        buf[0] = (p == 0) ? 'K' : 'M';
+        buf[1] = 'H';
+        buf[2] = 'Z';
+        buf[3] = 0;
         return;
     }
-    g_settingsActive = false;
-    saveAllReceiverInformation();
-    oled.clear();
-    showStatus(true);
-}
-
-void switchSettings()
-{
-    oled.clear();
-    if (g_settingsActive)
+    if (idx == SettingsIndex::SSM)
     {
-        g_menuLevel = 1;
-        g_menuCat = 0;
-        g_SettingSelected = 0;
-        g_SettingEditing = false;
-        showMenu();
+        if (p == 0)
+        {
+            buf[0] = 'R';
+            buf[1] = 'S';
+            buf[2] = 'S';
+        }
+        else
+        {
+            buf[0] = 'S';
+            buf[1] = 'N';
+            buf[2] = 'R';
+        }
+        buf[3] = 0;
+        return;
     }
-    else
+    if (idx == SettingsIndex::CWSwitch)
     {
-        saveAllReceiverInformation();
-        showStatus(true);
+        buf[0] = (p == 0) ? 'L' : 'U';
+        buf[1] = 'S';
+        buf[2] = 'B';
+        buf[3] = 0;
+        return;
     }
+    if (idx == SettingsIndex::CWPitch)
+    {
+        buf[0] = (char)('0' + p);
+        buf[1] = '0';
+        buf[2] = '0';
+        buf[3] = 0;
+        return;
+    }
+    if (idx == SettingsIndex::BFO)
+    {
+        buf[0] = (p < 0) ? '-' : '+';
+        convertToChar(&buf[1], (uint16_t)((p < 0) ? -p : p), 3);
+        return;
+    }
+    if (t == SettingType::ZeroAuto && p == 0)
+        goto aut;
+    if (t == SettingType::SwitchAuto)
+    {
+        if (p == 0)
+            goto aut;
+        if (p == 1)
+            goto on;
+        goto off;
+    }
+    if (t == SettingType::Switch)
+    {
+        if (p)
+            goto on;
+        goto off;
+    }
+    convertToChar(buf, (uint16_t)((p < 0) ? -p : (uint8_t)p), 3);
+    if (p < 0)
+        buf[0] = '-';
+    return;
+aut:
+    buf[0] = 'A';
+    buf[1] = 'U';
+    buf[2] = 'T';
+    buf[3] = 0;
+    return;
+on:
+    buf[0] = 'O';
+    buf[1] = 'N';
+    buf[2] = ' ';
+    buf[3] = 0;
+    return;
+off:
+    buf[0] = 'O';
+    buf[1] = 'F';
+    buf[2] = 'F';
+    buf[3] = 0;
 }
 
 //Draw curremt modulation
@@ -953,6 +883,32 @@ void paintTransient(const char* title, const char* value)
     g_uiLayer = UI_LAYER_TRANSIENT;
 }
 
+void showRadio()
+{
+    uint8_t idx = kRadioRing[g_radioSlot];
+    char buf[5];
+    radioValueToUI(buf, idx);
+    paintTransient(g_Settings[idx].name, buf);
+}
+
+void radioEnter()
+{
+    uint8_t m = (uint8_t)(1u << g_currentMode);
+    uint8_t s = 255;
+    for (uint8_t i = 0; i < kRadioN; i++)
+    {
+        if (pgm_read_byte(&kRadioMask[i]) & m)
+        {
+            s = i;
+            break;
+        }
+    }
+    if (s == 255)
+        return;
+    g_radioSlot = s;
+    switchCommand(CMD_RADIO, showRadio);
+}
+
 void showRadioError()
 {
     oledPrint("RADIO ERR", 0, 0, DEFAULT_FONT, true);
@@ -971,12 +927,12 @@ void showModulation()
     const char* lab = g_bandModeDesc[g_currentMode];
     if (g_muteVolume && (g_currentMode == FM || g_currentMode == AM))
         lab = "MUTE";
-    oledPrintModeBadge(lab, 0, BADGE_PAD);
-    uint8_t sx = (uint8_t)(oledBadgeWidth(lab, BADGE_PAD) + 2);
+    oledPrintKarat(lab, 0);
+    uint8_t sx = (uint8_t)(oledKaratTextW(lab) + 2);
     if (isSSB() && g_Settings[SettingsIndex::Sync].param == 1)
-        oledPrint("S", sx, 0, DEFAULT_FONT, true);
+        oledPrintKarat("S", sx, true);
     else
-        oledPrint(" ", sx, 0, DEFAULT_FONT);
+        oledPrintKarat("", sx, false, 1);
 }
 
 //Draw volume level
@@ -1212,70 +1168,109 @@ void showSMeter()
     bool dotDirty = (dot != drawnDot);
 
     uint8_t cue = 0;
-    static uint8_t cueDir = 0;
-    static uint8_t cueHold = 0;
-    static uint32_t cueStopAt = 0;
-    static uint16_t fmLock = 0;
-    if (g_currentMode != FM)
-        fmLock = 0;
-    if (g_processFreqChange)
-    {
-        cueDir = 0;
-        cueHold = 0;
-        cueStopAt = 0;
-    }
-    else if (!isSSB() && (now - g_lastFreqChange) >= FREQOFF_CUE_MS)
+    uint8_t aoffFm = 0;
+    static uint8_t farOn = 0;
+    static uint8_t searchBestSnr = 0;
+    static uint8_t searchPrevSnr = 0;
+    static uint8_t searchWay = 0;
+    static uint8_t farDir = 0;
+    static uint8_t farUp = 0;
+    static uint8_t farDn = 0;
+    static uint16_t lastCueF = 0;
+    uint8_t ssb = isSSB();
+    if (!g_processFreqChange && !ssb
+        && (now - g_lastFreqChange) >= FREQOFF_CUE_MS)
     {
         int8_t off = (int8_t)g_si4735.getCurrentSignedFrequencyOffset();
-        bool rail = g_si4735.getCurrentAfcRailIndicator();
-        uint8_t dir = 2;
-        int16_t df = 0;
-        uint16_t ad = 0;
-        if (g_currentMode == FM && fmLock)
+        if (g_currentMode == FM)
         {
-            df = (int16_t)fmLock - (int16_t)g_currentFrequency;
-            ad = (df < 0) ? (uint16_t)(-df) : (uint16_t)df;
-        }
-        if (g_currentMode == FM && ad > 10 && ad <= FREQOFF_FM_LOCK)
-            dir = (df > 0) ? 3 : 1;
-        else
-        {
-            int8_t lim = (g_currentMode == FM) ? (int8_t)FREQOFF_CUE_FM_KHZ : (int8_t)FREQOFF_CUE_KHZ;
-            if (rail)
-                dir = (off < 0) ? 3 : 1;
-            else if (off < -lim)
-                dir = 3;
-            else if (off > lim)
-                dir = 1;
-        }
-        if (dir == cueDir)
-        {
-            if (cueHold < FREQOFF_CUE_HOLD)
-                cueHold++;
-        }
-        else
-        {
-            cueDir = dir;
-            cueHold = 1;
-            cueStopAt = 0;
-        }
-        if (cueHold >= FREQOFF_CUE_HOLD)
-        {
-            if (dir == 2)
+            uint8_t snr = g_si4735.getCurrentSNR();
+            aoffFm = (off < 0) ? (uint8_t)(-off) : (uint8_t)off;
+            if (aoffFm >= FREQOFF_FAR_OFF)
             {
-                if (g_currentMode == FM)
-                    fmLock = g_currentFrequency;
-                if (!cueStopAt)
-                    cueStopAt = now;
-                if ((now - cueStopAt) < FREQOFF_STOP_MS)
-                    cue = 2;
+                if (snr < FREQOFF_SNR_FLOOR)
+                    farOn = 0;
+                else
+                {
+                    uint8_t way = g_seekDirection ? 1 : 0;
+                    if (!farOn || searchWay != way)
+                    {
+                        farOn = 1;
+                        searchWay = way;
+                        searchBestSnr = searchPrevSnr = snr;
+                        farUp = farDn = 0;
+                        farDir = way ? 3 : 1;
+                    }
+                    if (lastCueF != g_currentFrequency)
+                    {
+                        if (snr > (uint8_t)(searchBestSnr + 1))
+                            searchBestSnr = snr;
+                        if (snr > (uint8_t)(searchPrevSnr + 1))
+                        {
+                            farUp++;
+                            farDn = 0;
+                        }
+                        else if ((uint8_t)(snr + 1) < searchPrevSnr)
+                        {
+                            farDn++;
+                            farUp = 0;
+                        }
+                        else
+                            farUp = farDn = 0;
+                        if (farUp >= 2)
+                            farDir = way ? 3 : 1;
+                        else if (farDn >= 2
+                            && (uint8_t)(snr + 2) < searchBestSnr)
+                            farDir = way ? 1 : 3;
+                        searchPrevSnr = snr;
+                    }
+                    cue = farDir;
+                }
             }
             else
-                cue = dir;
+            {
+                farOn = 0;
+                bool valid = g_si4735.getCurrentValidChannel();
+                if (aoffFm > FREQOFF_CUE_FM_KHZ
+                    || g_si4735.getCurrentAfcRailIndicator())
+                    cue = (off < 0) ? 3 : 1;
+                else if (valid)
+                    cue = 2;
+            }
+        }
+        else if (off < -FREQOFF_CUE_KHZ)
+            cue = 1;
+        else if (off > FREQOFF_CUE_KHZ)
+            cue = 3;
+        else
+            cue = 2;
+        lastCueF = g_currentFrequency;
+    }
+    if ((cue == 1 || cue == 3) && aoffFm < FREQOFF_FAR_OFF && !(now & 512u))
+        cue = 0;
+
+    static uint16_t tunedF = 0;
+    uint8_t wantTuned = 0;
+    if (g_currentMode == FM)
+    {
+        if (tunedF && g_currentFrequency != tunedF)
+            tunedF = 0;
+        if (cue == 2)
+            tunedF = g_currentFrequency;
+        if (tunedF)
+        {
+            wantTuned = (uint8_t)!g_uiLayer;
+            cue = 0;
         }
     }
-    if ((cue == 1 || cue == 3) && !(now & 512u))
-        cue = 0;
+    else
+        tunedF = 0;
+    if (wantTuned != g_tunedDrawn)
+    {
+        g_tunedDrawn = wantTuned;
+        if (!g_uiLayer)
+            restoreIdleHeader();
+    }
 
     uint8_t barW = smBarW();
     uint8_t barMax = (uint8_t)(barW - SMETER_NEEDLE_W);
@@ -1304,7 +1299,8 @@ void showSMeter()
         peakX = barMax;
     uint8_t x0 = (uint8_t)(SMETER_LAB_X + SMETER_LAB_W + SMETER_LAB_GAP);
     static uint8_t prevBarX = 255;
-    static uint8_t prevCue = 255;
+    static uint8_t prevAux = 255;
+    static uint8_t prevAuxSnr = 255;
     uint8_t mhzX = (uint8_t)(g_freqRightX + FREQ_MHZ_GAP);
     static uint8_t stereoX = 255;
     g_stereoVis = (g_bandIndex == FM_BAND_TYPE) ? dot : 0;
@@ -1318,7 +1314,26 @@ void showSMeter()
         oledPrintStereoChip(stereoX, false);
         stereoX = 255;
     }
-    if (val == g_sMeterDrawnVal && peakX == smDrawnPeakX && !dotDirty && x0 == prevBarX && cue == prevCue)
+
+    uint8_t auxKind = g_auxInd;
+    uint8_t auxSnr = g_auxIndSnr;
+    if (auxKind == AUX_IND_AUTO)
+    {
+        if (g_bandIndex == SW_BAND_TYPE)
+        {
+            auxKind = AUX_IND_SNR;
+            auxSnr = g_si4735.getCurrentSNR();
+        }
+        else if (cue)
+            auxKind = cue;
+        else
+            auxKind = AUX_IND_EMPTY;
+    }
+    if (auxSnr > 99)
+        auxSnr = 99;
+
+    if (val == g_sMeterDrawnVal && peakX == smDrawnPeakX && !dotDirty && x0 == prevBarX
+        && auxKind == prevAux && (auxKind != AUX_IND_SNR || auxSnr == prevAuxSnr))
     {
         drawnDot = dot;
         return;
@@ -1326,7 +1341,9 @@ void showSMeter()
 
     {
         oledPrintSMeterLab(sUnit, plusDb != 0, g_sMeterDrawnVal == 255);
-        uint8_t tailX = (uint8_t)(x0 + barW);
+        uint8_t barEnd = (uint8_t)(x0 + barW);
+        uint8_t wx = auxWinX(barEnd);
+        uint8_t ww = auxWinW(barEnd);
         for (uint8_t pg = 0; pg < 2; pg++)
         {
             oled.setCursor((uint8_t)(SMETER_LAB_X + SMETER_LAB_W), UI_PAGE_SECONDARY + pg);
@@ -1359,23 +1376,23 @@ void showSMeter()
                     }
                 }
             }
-            oled.repeatData(0, FREQOFF_CUE_GAP);
-            if (cue)
+            oled.repeatData(0, AUX_WIN_GAP);
+            if (ww)
             {
-                uint8_t gi = (uint8_t)(cue - 1);
-                for (uint8_t x = 0; x < FREQOFF_CUE_W; x++)
-                    oled.sendData(pgm_read_byte(&kFreqOffCue[gi][(uint8_t)(pg * FREQOFF_CUE_W + x)]));
+                for (uint8_t lx = 0; lx < ww; lx++)
+                    oled.sendData(auxIndCol(lx, ww, pg, auxKind, auxSnr));
             }
-            else
-                oled.repeatData(0, FREQOFF_CUE_W);
-            oled.repeatData(0, (uint8_t)(128 - (tailX + FREQOFF_CUE_GAP + FREQOFF_CUE_W)));
+            uint8_t used = (uint8_t)(barEnd + AUX_WIN_GAP + ww);
+            if (used < 128)
+                oled.repeatData(0, (uint8_t)(128 - used));
             oled.endData();
         }
         g_sMeterDrawnVal = val;
         smDrawnPeakX = peakX;
         drawnDot = dot;
         prevBarX = x0;
-        prevCue = cue;
+        prevAux = auxKind;
+        prevAuxSnr = auxSnr;
     }
 }
 
@@ -1405,8 +1422,11 @@ void showBandwidth()
     }
     if (g_currentMode == CW)
         bw = g_bandwidthSSB[0].desc;
-    uint8_t w = oledBadgeWidth(bw, BADGE_PAD);
-    oledPrintModeBadge(bw, (uint8_t)((128 - w) / 2), BADGE_PAD);
+    uint8_t w = oledKaratTextW(bw);
+    uint8_t x = (uint8_t)((128 - w) / 2);
+    if (g_tunedDrawn)
+        x -= 8;
+    oledPrintKarat(bw, x);
 }
 
 void restoreIdleHeader()
@@ -1419,6 +1439,8 @@ void restoreIdleHeader()
     oled.fillLength(0, 128);
     showModulation();
     showBandwidth();
+    if (g_tunedDrawn)
+        oledPrintKarat("TUNED", (uint8_t)(128 - oledKaratTextW("TUNED")));
     showVolume();
 }
 
@@ -1915,7 +1937,7 @@ void switchCommand(uint8_t cmd, void (*showFunction)())
         restoreIdleHeader();
         showStep();
         showVolume();
-        if (prev == CMD_BRIGHT)
+        if (prev == CMD_BRIGHT || prev == CMD_RADIO)
             saveAllReceiverInformation();
         return;
     }
@@ -1943,7 +1965,8 @@ void switchCommand(uint8_t cmd, void (*showFunction)())
         showFunction();
     if (g_currentCmd == CMD_BAND || g_currentCmd == CMD_MODE)
         paintModeOrBand();
-    if (prev == CMD_BRIGHT && g_currentCmd != CMD_BRIGHT)
+    if ((prev == CMD_BRIGHT && g_currentCmd != CMD_BRIGHT)
+        || (prev == CMD_RADIO && g_currentCmd != CMD_RADIO))
         saveAllReceiverInformation();
 }
 
@@ -2075,37 +2098,7 @@ void loop()
             && !(g_currentCmd == CMD_VOLUME && g_volFromButtons))
             g_lastAdjustmentTime = millis();
 
-        if (g_settingsActive)
-        {
-            if (g_menuLevel == 1)
-            {
-                int8_t next = g_SettingSelected + g_encoderCount;
-                while (next < 0)
-                    next += MENU_CATS;
-                while (next >= MENU_CATS)
-                    next -= MENU_CATS;
-                g_SettingSelected = next;
-                showMenu();
-            }
-            else if (!g_SettingEditing)
-            {
-                int8_t n = (int8_t)kMenuCount[g_menuCat];
-                int8_t next = g_SettingSelected + g_encoderCount;
-                while (next < 0)
-                    next += n;
-                while (next >= n)
-                    next -= n;
-                g_SettingSelected = next;
-                showMenu();
-            }
-            else
-            {
-                uint8_t idx = menuItemAt((uint8_t)g_SettingSelected);
-                (*g_Settings[idx].manipulateCallback)(g_encoderCount);
-                DrawSetting(idx, (uint8_t)g_SettingSelected - menuScrollTop(), false);
-            }
-        }
-        else if (g_radioError)
+        if (g_radioError)
             ;
         else if (g_currentCmd == CMD_VOLUME && !g_volFromButtons)
         {
@@ -2141,6 +2134,12 @@ void loop()
             cycleModePick(g_encoderCount);
             paintModeOrBand();
         }
+        else if (g_currentCmd == CMD_RADIO)
+        {
+            g_uiLayer = UI_LAYER_TRANSIENT;
+            (*g_Settings[kRadioRing[g_radioSlot]].manipulateCallback)(g_encoderCount);
+            showRadio();
+        }
         else if (g_uiFocus == FOCUS_BFO && isSSB())
         {
             g_uiLayer = UI_LAYER_TRANSIENT;
@@ -2167,7 +2166,7 @@ void loop()
         poke |= btn_VolumeDn.checkEvent(simpleEvent);
         poke |= btn_Encoder.checkEvent(simpleEvent);
         poke |= btn_Step.checkEvent(simpleEvent);
-        poke |= btn_Mode.checkEvent(simpleEvent);
+        poke |= btn_Mode.checkEvent(modeBtnEvent);
         uint8_t agcOff = btn_AGC.checkEvent(agcEvent);
         if (BUTTONEVENT_SHORTPRESS == agcOff)
             displayWake();
@@ -2201,16 +2200,19 @@ void loop()
 
     if (g_uiLayer == UI_LAYER_TRANSIENT && g_lastAdjustmentTime != 0)
     {
+        uint32_t idle = (g_currentCmd == CMD_RADIO)
+            ? (uint32_t)CAVE_ACTIVE_TIMEOUT
+            : (uint32_t)ADJUSTMENT_ACTIVE_TIMEOUT;
         uint32_t dt = millis() - g_lastAdjustmentTime;
-        if (dt >= ADJUSTMENT_ACTIVE_TIMEOUT + OVERLAY_BLINK_MS)
+        if (dt >= idle + OVERLAY_BLINK_MS)
         {
             if (g_currentCmd == CMD_MODE)
                 commitModePick();
             switchCommand();
         }
-        else if (dt > ADJUSTMENT_ACTIVE_TIMEOUT)
+        else if (dt > idle)
         {
-            uint16_t ph = (uint16_t)(dt - ADJUSTMENT_ACTIVE_TIMEOUT);
+            uint16_t ph = (uint16_t)(dt - idle);
             bool fill = (ph < OVERLAY_FLASH_MS)
                 || (ph >= (uint16_t)(OVERLAY_FLASH_MS + OVERLAY_FLASH_GAP_MS));
             if ((uint8_t)(fill ? 1 : 0) != g_ovFill)
@@ -2226,23 +2228,11 @@ void loop()
     }
     if (BUTTONEVENT_SHORTPRESS == btn_BandUp.checkEvent(bandEvent))
     {
-        if (!g_settingsActive)
-        {
-            resetLowerLine();
-            switchCommand(CMD_BAND, showModulation);
-        }
-        else
-        {
-            menuBack();
-        }
+        resetLowerLine();
+        switchCommand(CMD_BAND, showModulation);
     }
     if (BUTTONEVENT_SHORTPRESS == btn_BandDn.checkEvent(bandEvent))
-    {
-        if (!g_settingsActive)
-            switchCommand();
-        g_settingsActive = !g_settingsActive;
-        switchSettings();
-    }
+        switchCommand();
     if (BUTTONEVENT_SHORTPRESS == btn_VolumeUp.checkEvent(volumeEvent))
     {
         if (!g_settingsActive && g_muteVolume == 0)
@@ -2259,23 +2249,7 @@ void loop()
     uint8_t encEvent = btn_Encoder.checkEvent(simpleEvent);
     if (BUTTONEVENT_SHORTPRESS == encEvent)
     {
-        if (g_settingsActive)
-        {
-            if (g_menuLevel == 1)
-            {
-                g_menuCat = (uint8_t)g_SettingSelected;
-                g_menuLevel = 2;
-                g_SettingSelected = 0;
-                g_SettingEditing = false;
-                showMenu();
-            }
-            else
-            {
-                g_SettingEditing = !g_SettingEditing;
-                showMenu();
-            }
-        }
-        else if (g_radioError)
+        if (g_radioError)
         {
             retryRadio();
             showStatus();
@@ -2293,9 +2267,7 @@ void loop()
     }
     else if (BUTTONEVENT_LONGPRESSDONE == encEvent)
     {
-        if (g_settingsActive)
-            menuBack();
-        else if (g_currentMode == FM || g_currentMode == AM)
+        if (g_currentMode == FM || g_currentMode == AM)
         {
             if (g_muteVolume)
                 setMuted(false);
@@ -2303,11 +2275,7 @@ void loop()
                 doSeek();
         }
         else
-        {
             switchCommand();
-            g_settingsActive = true;
-            switchSettings();
-        }
     }
 
     //This is a hack, it allows SHORTPRESS and LONGPRESS events
@@ -2317,39 +2285,33 @@ void loop()
     uint8_t agcEvent = btn_AGC.checkEvent(agcEvent);
     if (BUTTONEVENT_SHORTPRESS == agcEvent)
     {
-        if (!g_settingsActive || (g_settingsActive && !g_displayOn))
+        if (g_displayOn)
         {
-            if (g_displayOn)
-            {
-                if (g_currentCmd != CMD_NONE)
-                    switchCommand();
-                g_displayOn = false;
-                displayPower(false);
-            }
-            else
+            if (g_currentCmd != CMD_NONE)
+                switchCommand();
+            g_displayOn = false;
+            displayPower(false);
+        }
+        else
+        {
+            g_displayOn = true;
+            displayPower(true);
+        }
+        g_lastInputMs = millis();
+    }
+    if (BUTTONEVENT_FIRSTLONGPRESS == agcEvent)
+    {
+        if (g_currentCmd == CMD_BRIGHT)
+            switchCommand();
+        else
+        {
+            if (!g_displayOn)
             {
                 g_displayOn = true;
                 displayPower(true);
             }
-            g_lastInputMs = millis();
-        }
-    }
-    if (BUTTONEVENT_FIRSTLONGPRESS == agcEvent)
-    {
-        if (!g_settingsActive)
-        {
-            if (g_currentCmd == CMD_BRIGHT)
-                switchCommand();
-            else
-            {
-                if (!g_displayOn)
-                {
-                    g_displayOn = true;
-                    displayPower(true);
-                }
-                switchCommand(CMD_BRIGHT, showBrightness);
-                g_uiLayer = UI_LAYER_TRANSIENT;
-            }
+            switchCommand(CMD_BRIGHT, showBrightness);
+            g_uiLayer = UI_LAYER_TRANSIENT;
         }
     }
     uint8_t stepEvent = btn_Step.checkEvent(stepEvent);
@@ -2369,9 +2331,20 @@ void loop()
             showSMeter();
         }
     }
-    if (BUTTONEVENT_SHORTPRESS == btn_Mode.checkEvent(simpleEvent))
+    uint8_t modeEvent = btn_Mode.checkEvent(modeBtnEvent);
+    if (BUTTONEVENT_SHORTPRESS == modeEvent)
     {
-        if (!g_settingsActive)
+        if (g_currentCmd == CMD_RADIO)
+        {
+            uint8_t n = radioNextSlot(g_radioSlot);
+            if (n != 255)
+            {
+                g_radioSlot = n;
+                g_lastAdjustmentTime = millis();
+                showRadio();
+            }
+        }
+        else if (!g_settingsActive)
         {
             if (g_radioError)
             {
@@ -2382,6 +2355,9 @@ void loop()
             {
 #if USE_RDS
                 doRDS();
+#else
+                g_modePick = g_currentMode;
+                switchCommand(CMD_MODE);
 #endif
             }
             else if (g_currentCmd == CMD_MODE)
@@ -2391,6 +2367,16 @@ void loop()
                 g_modePick = g_currentMode;
                 switchCommand(CMD_MODE);
             }
+        }
+    }
+    else if (BUTTONEVENT_FIRSTLONGPRESS == modeEvent)
+    {
+        if (g_currentCmd == CMD_RADIO)
+            switchCommand();
+        else
+        {
+            switchCommand();
+            radioEnter();
         }
     }
 

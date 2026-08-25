@@ -1,0 +1,45 @@
+ATS-20Plus_next — срез 25 августа 2026
+Ветка: ATS-20Plus_next (локально, без push).
+Железо: 328PB / USB Optiboot 328P. Сборка `./build.sh uno`. Hex: build/uno/ATS_EX.ino.hex.
+Flash на конец дня: ~32162 / 32256. SRAM ~1087 / 2048.
+
+------------------------------------------------------------------------
+Итог дня (закрываем)
+
+UI / S-meter
+- Стена 7 кубов (8-й слот → универсальный индикатор).
+- S-lab + SNR: GOST 9×16 (plain, без chip fill). Генератор fonts/smeter_gost7x14.py + GOST_A.TTF.
+- Idle MODE/BW/TUNED/MUTE: plain Karat 5×7 (без заливки). Overlay TITLE…[chip] — 8×16 filled.
+- Универсальный индикатор (без скобок): SW AM+SSB → SNR dB (RSQ.SNR); WFM/AM → ◀/STOP/▶; иначе пусто.
+- WFM TUNED: после поимки STOP гаснет, TUNED справа, пока не сдвинули VFO.
+
+FREQOFF / cue (WFM)
+- NEAR: VALID+|off|≤12, не rail → STOP; иначе стрелки (знак 15:55).
+- FAR |off|≥120: SNR hill-climb × encoder, reverse после 2 hop и snr+2<best. Settle 200 ms.
+- fmLock не возвращали.
+
+Пещера
+- Полный MENU RADIO/DISP/AUDIO/SYS снят.
+- MODE long = однострочная пещера TITLE……[chip], кольцо 18 пунктов с mode-skip.
+- MODE short в этом слое = следующий TITLE; энкодер = VALUE; клик / 6 с = выход + EEPROM.
+- MODE long на WFM: как минимум DEE (и остальные по маске).
+- Баг: simpleEvent глотал FIRSTLONGPRESS — починен (modeBtnEvent).
+
+Flash hunt (Tier A + B2a)
+- radioOk→mask, radioValueToUI, splitFreq без /1000 (__udivmodsi4 снят из VFO path).
+- Цель ~1 KB запаса достигнута mid-day; к вечеру пещера/aux снова поджали потолок (~94 B).
+
+Документация
+- .cursor/rules/ats-ex-ui-overlays.mdc — актуальный idle/overlay/aux/cave.
+- reports/ATS-20Plus_next_2026-08-25.txt — этот срез.
+- mail/: INBOX tip (без опроса 3 мин). Архив писем не в git.
+
+Не в git: build/, mail/, лишние fonts/* mocks (кроме канона GOST/wall/aux strip).
+
+------------------------------------------------------------------------
+DUT checklist на завтра
+1. MODE long на AM/SSB/WFM → пещера; MODE short листает; 6 с hide.
+2. КВ SNR число (dB) в aux; WFM cue ◀/STOP/▶ + TUNED latch.
+3. avr-size после любого UI-пикселя.
+
+Команда: день закрыт. Следующий GO — через mail/ INBOX tip.

@@ -80,7 +80,16 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, u
                     mask = 0x7F;
             }
 
-            uint8_t b = filled ? 0xFF : 0;
+            uint8_t b;
+            if (filled)
+                b = 0xFF;
+            else if (x == 0 || x == (uint8_t)(boxW - 1))
+                b = mask;
+            else if (page == 0)
+                b = (d == 0) ? 0x08 : (d == 1) ? 0x04 : 0x02;
+            else
+                b = (d == 0) ? 0x10 : (d == 1) ? 0x20 : 0x40;
+
             if (x >= pad && x < pad + vis * 8)
             {
                 uint8_t ci = (uint8_t)((x - pad) / 8);
@@ -88,7 +97,7 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, u
                 uint8_t c = (uint8_t)text[skip + ci];
                 uint16_t off = (uint16_t)pobIndex(c) * 16 + (uint16_t)page * 8;
                 uint8_t g = pgm_read_byte(&f->bitmap[off + col]);
-                b = filled ? (uint8_t)~g : g;
+                b = filled ? (uint8_t)~g : (uint8_t)(b | g);
             }
             oled.sendData(b & mask);
         }
@@ -96,30 +105,120 @@ void oledPrintModeBadge(const char* text, uint8_t x0 = 0, uint8_t sidePad = 0, u
     }
 }
 
-// Karat-3.5 5×7: MHz (and leftover glyphs).
+// Karat-3.5 5×7: MHz + idle header (plain). Cell 6 px; indices 0–18 frozen for MHz.
 #define MHZ_LABEL_W 17
+#define KARAT_CELL_W 6
+#define KARAT_HDR_SHIFT 4
 
 static const uint8_t kKarat5x7[][5] PROGMEM = {
-    { 0x3E, 0x51, 0x49, 0x45, 0x3E },
-    { 0x00, 0x42, 0x7F, 0x40, 0x00 },
-    { 0x42, 0x61, 0x51, 0x49, 0x46 },
-    { 0x21, 0x41, 0x45, 0x4B, 0x31 },
-    { 0x18, 0x14, 0x12, 0x7F, 0x10 },
-    { 0x27, 0x45, 0x45, 0x45, 0x39 },
-    { 0x3C, 0x4A, 0x49, 0x49, 0x30 },
-    { 0x01, 0x71, 0x09, 0x05, 0x03 },
-    { 0x36, 0x49, 0x49, 0x49, 0x36 },
-    { 0x06, 0x49, 0x49, 0x29, 0x1E },
-    { 0x46, 0x49, 0x49, 0x49, 0x31 },
-    { 0x01, 0x01, 0x7F, 0x01, 0x01 },
-    { 0x7F, 0x49, 0x49, 0x49, 0x41 },
-    { 0x7F, 0x09, 0x19, 0x29, 0x46 },
-    { 0x3E, 0x41, 0x41, 0x41, 0x3E },
-    { 0x7F, 0x02, 0x0C, 0x02, 0x7F },
-    { 0x7F, 0x08, 0x08, 0x08, 0x7F },
-    { 0x44, 0x64, 0x54, 0x4C, 0x44 },
-    { 0x08, 0x08, 0x3E, 0x08, 0x08 }
+    { 0x3E, 0x51, 0x49, 0x45, 0x3E }, // 0
+    { 0x00, 0x42, 0x7F, 0x40, 0x00 }, // 1
+    { 0x42, 0x61, 0x51, 0x49, 0x46 }, // 2
+    { 0x21, 0x41, 0x45, 0x4B, 0x31 }, // 3
+    { 0x18, 0x14, 0x12, 0x7F, 0x10 }, // 4
+    { 0x27, 0x45, 0x45, 0x45, 0x39 }, // 5
+    { 0x3C, 0x4A, 0x49, 0x49, 0x30 }, // 6
+    { 0x01, 0x71, 0x09, 0x05, 0x03 }, // 7
+    { 0x36, 0x49, 0x49, 0x49, 0x36 }, // 8
+    { 0x06, 0x49, 0x49, 0x29, 0x1E }, // 9
+    { 0x46, 0x49, 0x49, 0x49, 0x31 }, // S
+    { 0x01, 0x01, 0x7F, 0x01, 0x01 }, // T
+    { 0x7F, 0x49, 0x49, 0x49, 0x41 }, // E
+    { 0x7F, 0x09, 0x19, 0x29, 0x46 }, // R
+    { 0x3E, 0x41, 0x41, 0x41, 0x3E }, // O
+    { 0x7F, 0x02, 0x0C, 0x02, 0x7F }, // M
+    { 0x7F, 0x08, 0x08, 0x08, 0x7F }, // H
+    { 0x44, 0x64, 0x54, 0x4C, 0x44 }, // z
+    { 0x08, 0x08, 0x3E, 0x08, 0x08 }, // +
+    { 0x7E, 0x11, 0x11, 0x11, 0x7E }, // A
+    { 0x7F, 0x49, 0x49, 0x49, 0x36 }, // B
+    { 0x3E, 0x41, 0x41, 0x41, 0x22 }, // C
+    { 0x7F, 0x41, 0x41, 0x22, 0x1C }, // D
+    { 0x7F, 0x09, 0x09, 0x09, 0x01 }, // F
+    { 0x3E, 0x41, 0x49, 0x49, 0x7A }, // G
+    { 0x00, 0x41, 0x7F, 0x41, 0x00 }, // I
+    { 0x7F, 0x08, 0x14, 0x22, 0x41 }, // K
+    { 0x7F, 0x40, 0x40, 0x40, 0x40 }, // L
+    { 0x7F, 0x04, 0x08, 0x10, 0x7F }, // N
+    { 0x3F, 0x40, 0x40, 0x40, 0x3F }, // U (open; closed 7F/41 reads as D)
+    { 0x3F, 0x40, 0x38, 0x40, 0x3F }, // W
+    { 0x00, 0x60, 0x60, 0x00, 0x00 }, // .
 };
+
+static uint8_t oledKaratIdx(char c)
+{
+    if (c >= '0' && c <= '9')
+        return (uint8_t)(c - '0');
+    switch (c)
+    {
+    case 'S': return 10;
+    case 'T': return 11;
+    case 'E': return 12;
+    case 'R': return 13;
+    case 'O': return 14;
+    case 'M': return 15;
+    case 'H': return 16;
+    case 'z': return 17;
+    case '+': return 18;
+    case 'A': return 19;
+    case 'B': return 20;
+    case 'C': return 21;
+    case 'D': return 22;
+    case 'F': return 23;
+    case 'G': return 24;
+    case 'I': return 25;
+    case 'K': return 26;
+    case 'L': return 27;
+    case 'N': return 28;
+    case 'U': return 29;
+    case 'W': return 30;
+    case '.': return 31;
+    default: return 255;
+    }
+}
+
+uint8_t oledKaratTextW(const char* text)
+{
+    uint8_t n = oledBadgeVis(text);
+    return (uint8_t)(n * KARAT_CELL_W);
+}
+
+// Plain 5×7 header text, vertically centered in 16 px (pages 0–1).
+// forceCells: draw N cells even if text is blank (clear / pad).
+void oledPrintKarat(const char* text, uint8_t x0, bool invert = false, uint8_t forceCells = 0)
+{
+    uint8_t skip = 0;
+    while (text[skip] == ' ')
+        skip++;
+    uint8_t vis = oledBadgeVis(text);
+    if (forceCells)
+        vis = forceCells;
+    uint8_t boxW = (uint8_t)(vis * KARAT_CELL_W);
+    for (uint8_t page = 0; page < 2; page++)
+    {
+        oled.setCursor(x0, page);
+        oled.startData();
+        for (uint8_t x = 0; x < boxW; x++)
+        {
+            uint8_t b = 0;
+            uint8_t c = (uint8_t)(x % KARAT_CELL_W);
+            if (c < 5 && text[skip + x / KARAT_CELL_W])
+            {
+                uint8_t ch = (uint8_t)text[skip + x / KARAT_CELL_W];
+                uint8_t idx = oledKaratIdx((char)ch);
+                if (idx != 255)
+                {
+                    uint16_t col = (uint16_t)pgm_read_byte(&kKarat5x7[idx][c]) << KARAT_HDR_SHIFT;
+                    b = page ? (uint8_t)(col >> 8) : (uint8_t)col;
+                }
+            }
+            if (invert)
+                b = (uint8_t)~b;
+            oled.sendData(b);
+        }
+        oled.endData();
+    }
+}
 
 void oledClear7segBand()
 {
@@ -255,8 +354,8 @@ void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
         return;
     uint8_t gw = SMETER_7X14_W;
     uint8_t gap = SMETER_S_GAP;
-    uint8_t inner = (uint8_t)(gw + gap + gw + gw);
-    uint8_t boxW = (uint8_t)(inner + 2 * BADGE_PAD);
+    // Keep full former chip width so old fill is erased.
+    uint8_t boxW = SMETER_LAB_W;
     uint8_t pad = BADGE_PAD;
     uint8_t x0 = SMETER_LAB_X;
     uint8_t dGi = sUnit;
@@ -267,30 +366,8 @@ void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
         oled.startData();
         for (uint8_t x = 0; x < boxW; x++)
         {
-            uint8_t d = x;
-            if ((uint8_t)(boxW - 1 - x) < d)
-                d = (uint8_t)(boxW - 1 - x);
-            uint8_t mask = (page == 0) ? 0xFE : 0x7F;
-            if (page == 0)
-            {
-                if (d == 0)
-                    mask = 0xF8;
-                else if (d == 1)
-                    mask = 0xFC;
-                else if (d == 2)
-                    mask = 0xFE;
-            }
-            else
-            {
-                if (d == 0)
-                    mask = 0x1F;
-                else if (d == 1)
-                    mask = 0x3F;
-                else if (d == 2)
-                    mask = 0x7F;
-            }
-            uint8_t b = 0xFF;
-            if (x >= pad && x < pad + inner)
+            uint8_t b = 0;
+            if (x >= pad)
             {
                 uint8_t lx = (uint8_t)(x - pad);
                 uint8_t gi = 255;
@@ -305,7 +382,7 @@ void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
                     gi = dGi;
                     col = (uint8_t)(lx - gw - gap);
                 }
-                else if (lx >= (uint8_t)(gw + gap + gw))
+                else if (lx >= (uint8_t)(gw + gap + gw) && lx < (uint8_t)(gw + gap + gw + gw))
                 {
                     gi = pGi;
                     col = (uint8_t)(lx - gw - gap - gw);
@@ -314,11 +391,10 @@ void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
                 {
                     uint16_t off = (uint16_t)gi * SMETER_7X14_BYTES
                         + (uint16_t)page * gw + col;
-                    uint8_t g = pgm_read_byte(&ssd1306xled_font7x14smeter[off]);
-                    b = (uint8_t)~g;
+                    b = pgm_read_byte(&ssd1306xled_font7x14smeter[off]);
                 }
             }
-            oled.sendData(b & mask);
+            oled.sendData(b);
         }
         oled.endData();
     }
@@ -327,21 +403,22 @@ void oledPrintSMeterLab(uint8_t sUnit, bool plus, bool forceS)
 }
 
 // Fleeing-wall: rectangles sized to read as perspective (concept trapezoids stay in fonts/).
-// SMETER_WALL_WIDE_GAP 1 restores the wide-break car-radio backup.
+// SMETER_WALL_WIDE_GAP 1 restores the wide-break car-radio backup (7 cells).
 #if SMETER_WALL_WIDE_GAP
-static const uint8_t kSmW[] PROGMEM = { 4, 5, 5, 6, 7, 8, 10, 12 };
-static const uint8_t kSmGap[] PROGMEM = { 2, 2, 2, 2, 6, 3, 3 };
-static const uint8_t kF0[] PROGMEM = { 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFC, 0xFE, 0xFE };
-static const uint8_t kF1[] PROGMEM = { 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x3F, 0x7F, 0x7F };
-static const uint8_t kO0[] PROGMEM = { 0x40, 0x20, 0x10, 0x08, 0x04, 0x04, 0x02, 0x02 };
-static const uint8_t kO1[] PROGMEM = { 0x02, 0x04, 0x08, 0x10, 0x20, 0x20, 0x40, 0x40 };
+static const uint8_t kSmW[] PROGMEM = { 4, 5, 5, 6, 7, 8, 10 };
+static const uint8_t kSmGap[] PROGMEM = { 2, 2, 2, 2, 6, 3 };
+static const uint8_t kF0[] PROGMEM = { 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFC, 0xFE };
+static const uint8_t kF1[] PROGMEM = { 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x3F, 0x7F };
+static const uint8_t kO0[] PROGMEM = { 0x40, 0x20, 0x10, 0x08, 0x04, 0x04, 0x02 };
+static const uint8_t kO1[] PROGMEM = { 0x02, 0x04, 0x08, 0x10, 0x20, 0x20, 0x40 };
 #else
-static const uint8_t kSmW[] PROGMEM = { 3, 3, 4, 5, 6, 8, 10, 13 };
-static const uint8_t kSmGap[] PROGMEM = { 2, 2, 2, 2, 2, 2, 2 };
-static const uint8_t kF0[] PROGMEM = { 0xC0, 0xE0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFE };
-static const uint8_t kF1[] PROGMEM = { 0x03, 0x07, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0x7F };
-static const uint8_t kO0[] PROGMEM = { 0x40, 0x20, 0x20, 0x10, 0x08, 0x04, 0x02, 0x02 };
-static const uint8_t kO1[] PROGMEM = { 0x02, 0x04, 0x04, 0x08, 0x10, 0x20, 0x40, 0x40 };
+static const uint8_t kSmW[] PROGMEM = { 3, 3, 4, 5, 6, 8, 10 };
+static const uint8_t kSmGap[] PROGMEM = { 2, 2, 2, 2, 2, 2 };
+// Heights 4 5 6 8 10 12 14 — seg2 between seg1 and seg3.
+static const uint8_t kF0[] PROGMEM = { 0xC0, 0xE0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE };
+static const uint8_t kF1[] PROGMEM = { 0x03, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F };
+static const uint8_t kO0[] PROGMEM = { 0x40, 0x20, 0x20, 0x10, 0x08, 0x04, 0x02 };
+static const uint8_t kO1[] PROGMEM = { 0x02, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40 };
 #endif
 
 static uint8_t smSegW(uint8_t i)
@@ -416,12 +493,82 @@ static uint8_t smBarLiveX(uint8_t rssi, uint8_t sUnit, uint8_t plusDb, uint8_t c
     return (uint8_t)(e0 + (uint16_t)(e1 - e0) * (uint8_t)t / 6);
 }
 
-// FREQOFF cue: ui freqoff_cue_{left,stop,right}.png, 11×16, page-major.
+// FREQOFF cue glyphs: ui freqoff_cue_{left,stop,right}.png, 11×16, page-major.
 static const uint8_t kFreqOffCue[3][22] PROGMEM = {
     { 0x80, 0xC0, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFC, 0xFE, 0xFF, 0xFF, 0x01, 0x03, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x3F, 0x7F, 0xFF, 0xFF },
     { 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0x00, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x00 },
     { 0xFF, 0xFF, 0xFE, 0xFC, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0xC0, 0x80, 0xFF, 0xFF, 0x7F, 0x3F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x03, 0x01 }
 };
+
+// Universal indicator slot after wall (no bracket chrome).
+static uint8_t auxWinW(uint8_t barEnd)
+{
+    uint8_t x = (uint8_t)(barEnd + AUX_WIN_GAP);
+    if (x >= (uint8_t)(128 - AUX_WIN_EDGE))
+        return 0;
+    return (uint8_t)(128 - AUX_WIN_EDGE - x);
+}
+
+static uint8_t auxWinX(uint8_t barEnd)
+{
+    return (uint8_t)(barEnd + AUX_WIN_GAP);
+}
+
+// Slot content only (no [ ] frame). kind: EMPTY/LEFT/STOP/RIGHT/SNR.
+static uint8_t auxIndCol(uint8_t lx, uint8_t winW, uint8_t page, uint8_t kind, uint8_t snr)
+{
+    uint8_t ink = 0;
+    for (uint8_t bit = 0; bit < 8; bit++)
+    {
+        uint8_t on = 0;
+        if (kind >= AUX_IND_LEFT && kind <= AUX_IND_RIGHT)
+        {
+            uint8_t gx = (uint8_t)((winW - FREQOFF_CUE_W) / 2);
+            if (lx >= gx && lx < (uint8_t)(gx + FREQOFF_CUE_W))
+            {
+                uint8_t gi = (uint8_t)(kind - AUX_IND_LEFT);
+                uint8_t b = pgm_read_byte(&kFreqOffCue[gi][(uint8_t)(page * FREQOFF_CUE_W + (lx - gx))]);
+                if (b & (uint8_t)(1 << bit))
+                    on = 1;
+            }
+        }
+        else if (kind == AUX_IND_SNR)
+        {
+            uint8_t v = snr;
+            if (v > 99)
+                v = 99;
+            uint8_t d0 = (uint8_t)(v / 10);
+            uint8_t d1 = (uint8_t)(v % 10);
+            // Same GOST digits as S-lab, gap 1.
+            uint8_t tw = (uint8_t)(SMETER_7X14_W * 2 + 1);
+            uint8_t cx0 = (uint8_t)((winW - tw) / 2);
+            uint8_t dig = 255;
+            uint8_t local = 0;
+            if (lx >= cx0 && lx < (uint8_t)(cx0 + SMETER_7X14_W))
+            {
+                dig = d0;
+                local = (uint8_t)(lx - cx0);
+            }
+            else if (lx >= (uint8_t)(cx0 + SMETER_7X14_W + 1)
+                && lx < (uint8_t)(cx0 + tw))
+            {
+                dig = d1;
+                local = (uint8_t)(lx - (cx0 + SMETER_7X14_W + 1));
+            }
+            if (dig != 255)
+            {
+                uint16_t off = (uint16_t)dig * SMETER_7X14_BYTES
+                    + (uint16_t)page * SMETER_7X14_W + local;
+                uint8_t col = pgm_read_byte(&ssd1306xled_font7x14smeter[off]);
+                if (col & (uint8_t)(1 << bit))
+                    on = 1;
+            }
+        }
+        if (on)
+            ink |= (uint8_t)(1 << bit);
+    }
+    return ink;
+}
 
 void oledPrint(const char* text, int offX = -1, int offY = -1, const DCfont* font = LastFont, bool invert = false)
 {
@@ -498,9 +645,20 @@ int ilen(uint16_t n)
 //Split KHz frequency + BFO to KHz and .00 tail
 void splitFreq(uint16_t& khz, uint16_t& tail)
 {
-    int32_t freq = (uint32_t(g_currentFrequency) * 1000) + g_currentBFO;
-    khz = freq / 1000;
-    tail = abs(freq % 1000) / 10;
+    int16_t b = (int16_t)g_currentBFO;
+    uint16_t k = g_currentFrequency;
+    while (b >= 1000)
+    {
+        b = (int16_t)(b - 1000);
+        k++;
+    }
+    while (b < 0)
+    {
+        b = (int16_t)(b + 1000);
+        k--;
+    }
+    khz = k;
+    tail = (uint16_t)((uint16_t)b / 10);
 }
 
 uint8_t strlen8(const char* str)

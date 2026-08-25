@@ -62,14 +62,14 @@
 #define S9_DBUV 34
 #define SMETER_MAX_OVER_S9 60
 #define SMETER_LEVELS 16
-#define SMETER_CUBES 8
+#define SMETER_CUBES 7
 // 0 = fleeing-wall rects (even gaps). 1 = backup: wide gap after ~S5.
 #define SMETER_WALL_WIDE_GAP 0
-// Segment W/H/gaps: PROGMEM in Utils.h.
+// Segment W/H/gaps: PROGMEM in Utils.h (7 cells; 8th reclaimed for aux indicator).
 #define SMETER_LAB_X 0
-#define SMETER_LAB_W 28
+#define SMETER_LAB_W 30
 #define SMETER_LAB_GAP 3
-#define SMETER_S_GAP 3
+#define SMETER_S_GAP 1
 #define SMETER_LAB_UP 1
 // Deadband on RSSI before S-unit / needle may move.
 #define SMETER_HYST_DB 3
@@ -77,16 +77,26 @@
 #define SMETER_PEAK_NUM 7
 #define SMETER_PEAK_DEN 4
 #define SMETER_NEEDLE_W 3
-#define FREQOFF_CUE_MS 1000
+#define FREQOFF_CUE_MS 200
 #define FREQOFF_CUE_KHZ 1
 #define FREQOFF_CUE_FM_KHZ 12
 #define FREQOFF_CUE_W 11
-#define FREQOFF_CUE_GAP 8
-#define FREQOFF_CUE_HOLD 5
-#define FREQOFF_STOP_MS 2000
-#define FREQOFF_FM_LOCK 20
+#define FREQOFF_SNR_NEAR 10
+#define FREQOFF_SNR_FLOOR 4
+#define FREQOFF_FAR_OFF 120
+// Universal indicator [····] after S-wall (ui auxwin1_*). Dev sets g_auxInd.
+#define AUX_IND_AUTO 255
+#define AUX_IND_EMPTY 0
+#define AUX_IND_LEFT 1
+#define AUX_IND_STOP 2
+#define AUX_IND_RIGHT 3
+#define AUX_IND_SNR 4
+#define AUX_WIN_GAP 3
+#define AUX_WIN_EDGE 1
+#define AUX_WIN_SERIF 3
 #define DEFAULT_VOLUME 25
 #define ADJUSTMENT_ACTIVE_TIMEOUT 2000
+#define CAVE_ACTIVE_TIMEOUT 6000
 #define OVERLAY_FLASH_MS 250
 #define OVERLAY_FLASH_GAP_MS 125
 #define OVERLAY_BLINK_MS (OVERLAY_FLASH_MS + OVERLAY_FLASH_GAP_MS + OVERLAY_FLASH_MS)

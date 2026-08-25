@@ -16,6 +16,8 @@ reports/
 Журнал ветки
 - ATS-20Plus_next_log.txt — что уже в прошивке, что дальше, flash/SRAM, известные компромиссы
 - ATS-20Plus_next_2026-08-24.txt — срез дня: idle UI, S-meter S9+, зазоры 7-seg, что на железо
+- ATS-20Plus_next_2026-08-25.txt — срез дня: 7c wall + aux SNR/FREQOFF, one-line cave (MODE long), TUNED, flash hunt
 - ATS-20_UI_pixel_grid.txt — фактическая раскладка 128×64 в текущем коде
 
 Правило: новые решения кратко в log. Один эксперимент = один commit = один avr-size = один hardware test.
+UI overlays / idle: .cursor/rules/ats-ex-ui-overlays.mdc (alwaysApply).
