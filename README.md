@@ -8,6 +8,20 @@ Next-generation firmware for **ATS-20 / ATS-20+** receivers (**ATmega328** + **S
 
 Lineage: **Goshante ATS_EX v1.18** (PU2CLR) → hardware services from **diqezit** → new OLED UI and radio core polish for **328PB / 32 KB flash**.
 
+## UI (main screen)
+
+Photos on **ATS-20+** hardware, firmware **2.0B**.
+
+<p align="center">
+  <img src="img/ats_20_final1.png" alt="SSB main screen: 7150.00 kHz LSB, 3.0K bandwidth, S7 S-meter, SNR aux" width="520" />
+  <br /><sub><b>SSB (LSB), 7150 kHz</b> — Icom-style VFO, idle MODE/BW (Karat), 7-cell S-meter wall, GOST S-label, SNR (dB) in aux slot</sub>
+</p>
+
+<p align="center">
+  <img src="img/ats_20_final2.png" alt="WFM main screen: 101.00 MHz, TUNED, S9+ S-meter, stereo pilot" width="520" />
+  <br /><sub><b>WFM, 101 MHz</b> — TUNED latch, stereo pictogram, S9+, AUTO bandwidth</sub>
+</p>
+
 ## User guide (Russian)
 
 **[docs/USER_GUIDE.ru.md](docs/USER_GUIDE.ru.md)** — full manual: controls, overlays, settings cave, S-meter, FM FREQOFF, differences vs Goshante v1.18 and diqezit.
@@ -21,6 +35,15 @@ Lineage: **Goshante ATS_EX v1.18** (PU2CLR) → hardware services from **diqezit
 ```
 
 Target: **Arduino Uno FQBN** (32256 B flash). Silicon is often **ATmega328PB** (ISP `-p m328pb`).
+
+## Flashing
+
+**Required programmer:** [**USBasp NG**](https://github.com/minerdear0-jpg/usbasp_ng) — ISP adapter for ATmega328(P/PB). Needed for first-time flash and for the full image (app + bootloader).
+
+| Release file | Tool | When |
+|--------------|------|------|
+| `ats20plus_ng_v2.0B_usb.hex` | USB-UART (CH340) + AVRDUDESS / avrdude | Bootloader already on the receiver; routine updates |
+| `ats20plus_ng_v2.0B_with_bootloader.hex` | **USBasp NG** (ISP) | Blank chip, bricked bootloader, or full reflash |
 
 After first flash: hold **encoder button** at power-on for **EEPROM RESET**.
 
@@ -44,7 +67,3 @@ Details: [docs/USER_GUIDE.ru.md](docs/USER_GUIDE.ru.md).
 - **PU2CLR** — Si4735 library lineage  
 - **diqezit** — ANB/SQL and hardware-oriented fixes  
 - **esp32-si4732/ats-mini** — architectural ideas (not a port)
-
-<p align="center">
-    <img src="img/ats20.png" alt="ATS-20" />
-</p>
