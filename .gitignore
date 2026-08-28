@@ -399,3 +399,9 @@ FodyWeavers.xsd
 
 # Nested olikraus/u8g2 clone (~500 MB). Runtime uses ATS_EX/font7x14smeter.h.
 u8g2/
+
+# Local-only: dev journal, mail, mocks, legacy readme tree
+reports/
+rus/
+mail/
+build/
