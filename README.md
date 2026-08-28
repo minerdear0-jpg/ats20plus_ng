@@ -3,7 +3,8 @@
 Next-generation firmware for **ATS-20 / ATS-20+** receivers (**ATmega328** + **Si4735**).
 
 **Version:** 2.0B  
-**Repository:** https://github.com/minerdear0-jpg/ats20plus_ng
+**Repository:** https://github.com/minerdear0-jpg/ats20plus_ng  
+**Download (.hex):** https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B
 
 Lineage: **Goshante ATS_EX v1.18** (PU2CLR) → hardware services from **diqezit** → new OLED UI and radio core polish for **328PB / 32 KB flash**.
 

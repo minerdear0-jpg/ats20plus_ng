@@ -4,7 +4,8 @@
 
 **Версия:** 2.0B  
 **Сборка:** `./build.sh uno` → `build/uno/ATS_EX.ino.hex`  
-**Репозиторий:** https://github.com/minerdear0-jpg/ats20plus_ng
+**Репозиторий:** https://github.com/minerdear0-jpg/ats20plus_ng  
+**Скачать .hex:** https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B
 
 ---
 
@@ -48,8 +49,11 @@
 ## Прошивка и первый запуск
 
 1. Определите плату: **Nano** (Arduino отдельной платой) или **Uno** (328 на одной плате). ATS-20+ обычно **Uno**, flash **32256** байт.
-2. Соберите: `./build.sh uno` или прошейте готовый `.hex` через **AVRDUDESS** / **avrdude**.
-3. **Сброс EEPROM:** удерживайте **кнопку энкодера** при включении → **EEPROM RESET**.
+2. Скачайте из [релиза v2.0B](https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B):
+   - **`ats20plus_ng_v2.0B_usb.hex`** — прошивка **через USB** (Optiboot уже стоит на приёмнике);
+   - **`ats20plus_ng_v2.0B_with_bootloader.hex`** — **приложение + bootloader** (ISP / USBasp).
+3. Или соберите сами: `./build.sh uno`.
+4. **Сброс EEPROM:** удерживайте **кнопку энкодера** при включении → **EEPROM RESET**.
 
 При проблемах с USB используйте порт **USB 3.0**, включайте приёмник **до** подключения кабеля.
 
