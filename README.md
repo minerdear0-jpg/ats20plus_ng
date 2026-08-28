@@ -10,17 +10,15 @@ Lineage: **Goshante ATS_EX v1.18** (PU2CLR) → hardware services from **diqezit
 
 ## UI (main screen)
 
-Photos on **ATS-20+** hardware, firmware **2.0B**.
+Firmware **2.0B** on **ATS-20+** hardware.
 
-<p align="center">
-  <img src="img/ats_20_final1.png" alt="SSB main screen: 7150.00 kHz LSB, 3.0K bandwidth, S7 S-meter, SNR aux" width="520" />
-  <br /><sub><b>SSB (LSB), 7150 kHz</b> — Icom-style VFO, idle MODE/BW (Karat), 7-cell S-meter wall, GOST S-label, SNR (dB) in aux slot</sub>
-</p>
+![SSB main screen: 7150.00 kHz LSB, 3.0K bandwidth, S7 S-meter, SNR aux](img/ats_20_final1.png)
 
-<p align="center">
-  <img src="img/ats_20_final2.png" alt="WFM main screen: 101.00 MHz, TUNED, S9+ S-meter, stereo pilot" width="520" />
-  <br /><sub><b>WFM, 101 MHz</b> — TUNED latch, stereo pictogram, S9+, AUTO bandwidth</sub>
-</p>
+*SSB (LSB), 7150 kHz — Icom-style VFO, idle MODE/BW (Karat), 7-cell S-meter wall, GOST S-label, SNR (dB) in aux slot*
+
+![WFM main screen: 101.00 MHz, TUNED, S9+ S-meter, stereo pilot](img/ats_20_final2.png)
+
+*WFM, 101 MHz — TUNED latch, stereo pictogram, S9+, AUTO bandwidth*
 
 ## User guide (Russian)
 
