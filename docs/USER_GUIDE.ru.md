@@ -49,10 +49,11 @@
 ## Прошивка и первый запуск
 
 1. Определите плату: **Nano** (Arduino отдельной платой) или **Uno** (328 на одной плате). ATS-20+ обычно **Uno**, flash **32256** байт.
-2. Скачайте из [релиза v2.0B](https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B):
-   - **`ats20plus_ng_v2.0B_usb.hex`** — прошивка **через USB** (Optiboot уже стоит на приёмнике);
-   - **`ats20plus_ng_v2.0B_with_bootloader.hex`** — **приложение + bootloader** (ISP / USBasp).
-3. Или соберите сами: `./build.sh uno`.
+2. Скачайте из [релиза v2.0C](https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0C):
+   - **`ats20plus_ng_v2.0C_usb.hex`** — прошивка **через USB** (Optiboot уже стоит на приёмнике);
+   - **`ats20plus_ng_v2.0C_with_bootloader.hex`** — **приложение + bootloader** (ISP / USBasp);
+   - файлы с суффиксом **`_328pb`** — микрокод под реальный **ATmega328PB** (ISP-сигнатура `1E 95 16`); на PB-плате берите их.
+3. Или соберите сами: `./build.sh 328pb` (или `./build.sh uno` под 328P).
 4. **Сброс EEPROM:** удерживайте **кнопку энкодера** при включении → **EEPROM RESET**.
 
 При проблемах с USB используйте порт **USB 3.0**, включайте приёмник **до** подключения кабеля.

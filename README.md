@@ -4,7 +4,7 @@ Next-generation firmware for **ATS-20 / ATS-20+** receivers (**ATmega328** + **S
 
 **Version:** 2.0C  
 **Repository:** https://github.com/minerdear0-jpg/ats20plus_ng  
-**Download (.hex):** https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B
+**Download (.hex):** https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0C
 
 Lineage: **Goshante ATS_EX v1.18** (PU2CLR) → hardware services from **diqezit** → new OLED UI and radio core polish for **328PB / 32 KB flash**.
 
@@ -45,10 +45,16 @@ The `uno` target stays byte-identical to earlier releases.
 
 **Required programmer:** [**USBasp NG**](https://github.com/minerdear0-jpg/usbasp_ng) — ISP adapter for ATmega328(P/PB). Needed for first-time flash and for the full image (app + bootloader).
 
-| Release file | Tool | When |
-|--------------|------|------|
-| `ats20plus_ng_v2.0B_usb.hex` | USB-UART (CH340) + AVRDUDESS / avrdude | Bootloader already on the receiver; routine updates |
-| `ats20plus_ng_v2.0B_with_bootloader.hex` | **USBasp NG** (ISP) | Blank chip, bricked bootloader, or full reflash |
+| Release file | Silicon | Tool | When |
+|--------------|---------|------|------|
+| `ats20plus_ng_v2.0C_usb.hex` | 328P / generic | USB-UART (CH340) + AVRDUDESS / avrdude | Bootloader already on the receiver; routine updates |
+| `ats20plus_ng_v2.0C_with_bootloader.hex` | 328P / generic | **USBasp NG** (ISP) | Blank chip, bricked bootloader, or full reflash |
+| `ats20plus_ng_v2.0C_328pb_usb.hex` | **ATmega328PB** | USB-UART (CH340) + AVRDUDESS / avrdude | PB board, bootloader present; routine updates |
+| `ats20plus_ng_v2.0C_328pb_with_bootloader.hex` | **ATmega328PB** | **USBasp NG** (ISP) | PB board — blank chip, bricked bootloader, or full reflash |
+
+The `_328pb` files are built for the real silicon (`./build.sh 328pb`); the
+plain files are the 328P image and stay byte-identical to v2.0B. Either runs on
+a 328PB board, but prefer the `_328pb` build there.
 
 After first flash: hold **encoder button** at power-on for **EEPROM RESET**.
 
