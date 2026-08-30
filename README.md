@@ -2,7 +2,7 @@
 
 Next-generation firmware for **ATS-20 / ATS-20+** receivers (**ATmega328** + **Si4735**).
 
-**Version:** 2.0B  
+**Version:** 2.0C  
 **Repository:** https://github.com/minerdear0-jpg/ats20plus_ng  
 **Download (.hex):** https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B
 
@@ -10,7 +10,7 @@ Lineage: **Goshante ATS_EX v1.18** (PU2CLR) → hardware services from **diqezit
 
 ## UI (main screen)
 
-Firmware **2.0B** on **ATS-20+** hardware.
+Firmware **2.0C** on **ATS-20+** hardware.
 
 ![SSB main screen: 7150.00 kHz LSB, 3.0K bandwidth, S7 S-meter, SNR aux](img/ats_20_final1.png)
 
@@ -27,12 +27,19 @@ Firmware **2.0B** on **ATS-20+** hardware.
 ## Build
 
 ```bash
-./build.sh uno              # hex → build/uno/ATS_EX.ino.hex (not in git)
-./build.sh --fast uno
-./build.sh --upload uno       # CH340 / ttyUSB, Optiboot 328P @ 115200
+./build.sh uno              # hex → build/uno/ATS_EX.ino.hex (328P, not in git)
+./build.sh 328pb            # hex → build/328pb/ATS_EX.ino.hex (real 328PB silicon)
+./build.sh --fast 328pb
+./build.sh --upload 328pb     # CH340 / ttyUSB, Optiboot 328P @ 115200
 ```
 
-Target: **Arduino Uno FQBN** (32256 B flash). Silicon is often **ATmega328PB** (ISP `-p m328pb`).
+Target: **Arduino Uno FQBN** (32256 B flash). The DUT is populated with an
+**ATmega328PB** (ISP signature `1E 95 16`, `-p m328pb`); the on-board Optiboot
+still answers as 328P over USB. Use **`328pb`** to build the microcode for the
+actual chip — it retargets the compiler/linker at `-mmcu=atmega328pb` so the
+hand-rolled TWI driver sees the PB register map, and relaxes the link
+(`-Wl,--relax`) to absorb the PB's larger vector table within the flash budget.
+The `uno` target stays byte-identical to earlier releases.
 
 ## Flashing
 

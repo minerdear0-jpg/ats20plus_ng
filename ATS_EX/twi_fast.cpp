@@ -1,4 +1,5 @@
 #include <avr/io.h>
+#include "twi_328pb_compat.h"   // 328PB: alias TWBR0/TWSR0/... -> legacy names
 #include <util/twi.h>
 #include "twi_fast.h"
 #include "twi_fast_wire.h"

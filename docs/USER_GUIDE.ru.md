@@ -2,8 +2,8 @@
 
 Прошивка **ats20plus_ng** для приёмников **ATS-20 / ATS-20+** на **ATmega328** и **Si473x**.
 
-**Версия:** 2.0B  
-**Сборка:** `./build.sh uno` → `build/uno/ATS_EX.ino.hex`  
+**Версия:** 2.0C  
+**Сборка:** `./build.sh 328pb` → `build/328pb/ATS_EX.ino.hex` (микрокод под реальный ATmega328PB; `./build.sh uno` — вариант под 328P)  
 **Репозиторий:** https://github.com/minerdear0-jpg/ats20plus_ng  
 **Скачать .hex:** https://github.com/minerdear0-jpg/ats20plus_ng/releases/tag/v2.0B
 

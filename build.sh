@@ -14,10 +14,17 @@ TARGET="uno"
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [options] [uno|nano]
+Usage: $(basename "$0") [options] [uno|328pb|nano]
 
-  uno     Arduino Uno FQBN (default). Hex for the ATS-20Plus_next DUT:
-          ATmega328PB, Optiboot 115200 (hfuse 0xDE / 512 B boot)
+  uno     Arduino Uno FQBN (default). Builds for ATmega328P. The DUT's
+          Optiboot answers as 328P over USB, so this hex flashes fine there.
+  328pb   Same Uno FQBN, but the microcode is built for the real silicon
+          (-mmcu=atmega328pb): the ATS-20Plus_next DUT is populated with an
+          ATmega328PB (ISP signature 1E 95 16). Needed to compile the
+          hand-rolled TWI driver against the PB register map, and to get a
+          vector table / CRT that matches the chip. Linker relaxation
+          (-Wl,--relax) offsets the PB's larger vector table so the image
+          still fits the 32256 B Optiboot budget.
   nano    Arduino Nano old bootloader (ATmega328P, 57600)
 
 Options:
@@ -71,7 +78,7 @@ while [[ $# -gt 0 ]]; do
         UPLOAD_PORT="auto"
       fi
       ;;
-    uno|nano)
+    uno|nano|328pb)
       TARGET="$1"
       shift
       ;;
@@ -83,12 +90,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Per-target: FQBN, avr-size MCU, and any --build-property overrides.
+BUILD_PROPS=()
 case "${TARGET}" in
   uno)
     FQBN="arduino:avr:uno"
+    SIZE_MCU="atmega328p"
+    ;;
+  328pb)
+    # Uno core/bootloader, but retarget the compiler+linker at the real
+    # ATmega328PB. build.mcu flows into every -mmcu= in the Arduino recipes;
+    # -Wl,--relax buys back the ~136 B the PB's bigger vector table costs so
+    # the app still clears the 32256 B Optiboot ceiling.
+    FQBN="arduino:avr:uno"
+    SIZE_MCU="atmega328pb"
+    BUILD_PROPS=(
+      --build-property build.mcu=atmega328pb
+      --build-property "compiler.c.elf.extra_flags=-Wl,--relax"
+    )
     ;;
   nano)
     FQBN="arduino:avr:nano:cpu=atmega328old"
+    SIZE_MCU="atmega328p"
     ;;
   *)
     echo "build.sh: bad target ${TARGET}" >&2
@@ -119,6 +142,9 @@ cp -a "${SKETCH}/twi_fast.h" "${SKETCH}/twi_fast_wire.h" "${PATCHED_SI4735}/src/
 python3 "${ROOT}/tools/patch_si4735_wire.py" "${PATCHED_SI4735}/src"
 
 CMD=(arduino-cli compile --fqbn "${FQBN}" --library "${PATCHED_SI4735}" --build-path "${TMP}" --output-dir "${OUT}" "${SKETCH}")
+if [[ ${#BUILD_PROPS[@]} -gt 0 ]]; then
+  CMD+=("${BUILD_PROPS[@]}")
+fi
 if [[ "${CLEAN}" -eq 1 ]]; then
   CMD+=(--clean)
 fi
@@ -129,7 +155,7 @@ echo ">> ${CMD[*]}"
 ELF="${OUT}/ATS_EX.ino.elf"
 if [[ -f "${ELF}" ]] && command -v avr-size >/dev/null; then
   echo
-  avr-size -C --mcu=atmega328p "${ELF}" || avr-size "${ELF}"
+  avr-size -C --mcu="${SIZE_MCU}" "${ELF}" || avr-size "${ELF}"
 fi
 
 HEX="${OUT}/ATS_EX.ino.hex"
@@ -145,12 +171,14 @@ if [[ "${UPLOAD_PORT}" == auto ]]; then
   UPLOAD_PORT="$(pick_usb_port)"
 fi
 
-if [[ "${TARGET}" == uno ]]; then
+if [[ "${TARGET}" == uno || "${TARGET}" == 328pb ]]; then
   command -v avrdude >/dev/null || {
     echo "build.sh: avrdude not on PATH" >&2
     exit 1
   }
-  # USB talks to Uno Optiboot: it reports 328P. Do not use -p m328pb here.
+  # USB talks to the on-board Optiboot, which reports 328P even on 328PB
+  # silicon. Keep -p m328p here regardless of target; ISP (USBasp) is the
+  # only path that needs -p m328pb.
   echo ">> avrdude -c arduino -P ${UPLOAD_PORT} -b 115200 -p m328p -D -U flash:w:${HEX}:i"
   avrdude -c arduino -P "${UPLOAD_PORT}" -b 115200 -p m328p -D -U "flash:w:${HEX}:i"
 else
